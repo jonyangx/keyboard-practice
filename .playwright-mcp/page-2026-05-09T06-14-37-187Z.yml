@@ -1,0 +1,60 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]: "SCORE: 0"
+    - generic [ref=e4]: "WORLD: 基准键 Home Row"
+    - generic [ref=e5]: x0
+  - generic [ref=e8]:
+    - heading "键盘跑酷" [level=1] [ref=e9]
+    - heading "Keyboard Runner — 基准键 Home Row" [level=2] [ref=e10]
+    - paragraph [ref=e11]:
+      - text: 按 color-coded key 跳过障碍
+      - text: 用正确的手指按下对应的键
+      - text: Each key belongs to a finger — learn the zones!
+    - button "开始 START" [ref=e12] [cursor=pointer]
+    - generic [ref=e13]: or press Space to start
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]: "1"
+      - generic [ref=e17]: "2"
+      - generic [ref=e18]: "3"
+      - generic [ref=e19]: "4"
+      - generic [ref=e20]: "5"
+      - generic [ref=e21]: "6"
+      - generic [ref=e22]: "7"
+      - generic [ref=e23]: "8"
+      - generic [ref=e24]: "9"
+      - generic [ref=e25]: "0"
+    - generic [ref=e26]:
+      - generic [ref=e27]: Q
+      - generic [ref=e28]: W
+      - generic [ref=e29]: E
+      - generic [ref=e30]: R
+      - generic [ref=e31]: T
+      - generic [ref=e32]: "Y"
+      - generic [ref=e33]: U
+      - generic [ref=e34]: I
+      - generic [ref=e35]: O
+      - generic [ref=e36]: P
+    - generic [ref=e37]:
+      - generic [ref=e38]: A
+      - generic [ref=e39]: S
+      - generic [ref=e40]: D
+      - generic [ref=e41]: F
+      - generic [ref=e42]: G
+      - generic [ref=e43]: H
+      - generic [ref=e44]: J
+      - generic [ref=e45]: K
+      - generic [ref=e46]: L
+      - generic [ref=e47]: ;
+    - generic [ref=e48]:
+      - generic [ref=e49]: Z
+      - generic [ref=e50]: X
+      - generic [ref=e51]: C
+      - generic [ref=e52]: V
+      - generic [ref=e53]: B
+      - generic [ref=e54]: "N"
+      - generic [ref=e55]: M
+      - generic [ref=e56]: ","
+      - generic [ref=e57]: .
+      - generic [ref=e58]: /
+    - generic [ref=e60]: SPACE

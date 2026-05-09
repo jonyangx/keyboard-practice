@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>键盘跑酷 — Keyboard Runner</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; font-family: -apple-system, system-ui, 'Segoe UI', sans-serif; color: #e0e0e0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+  /* HUD */
+  .hud { display: flex; justify-content: space-between; align-items: center; padding: 8px 20px; background: #16213e; border-bottom: 1px solid #0f3460; min-height: 44px; }
+  .hud-score { font-size: 16px; font-weight: 700; color: #00d2ff; }
+  .hud-lesson { font-size: 13px; color: #a0a0c0; }
+  .hud-lesson span { color: #53d769; font-weight: 600; }
+  .hud-combo { font-size: 20px; font-weight: 900; color: #ff6b6b; text-shadow: 0 0 10px rgba(255,107,107,0.5); }
+  .hud-combo.inactive { opacity: 0.3; }
+
+  /* Canvas */
+  .canvas-wrap { flex: 1; position: relative; min-height: 200px; }
+  .canvas-wrap canvas { display: block; width: 100%; height: 100%; }
+
+  /* Prompt */
+  .prompt { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #ffd93d; background: rgba(0,0,0,0.6); padding: 3px 10px; border-radius: 4px; pointer-events: none; white-space: nowrap; }
+
+  /* On-screen keyboard */
+  .keyboard { padding: 8px 12px 10px; background: #16213e; display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .kb-row { display: flex; gap: 3px; }
+  .key { width: 36px; height: 36px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; border: 2px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); color: #666; transition: transform 0.1s, box-shadow 0.1s, border-color 0.1s; }
+  .key.lp { background: rgba(255,107,107,0.15); color: #ff6b6b; border-color: rgba(255,107,107,0.3); }
+  .key.lr { background: rgba(255,160,107,0.15); color: #ffa06b; border-color: rgba(255,160,107,0.3); }
+  .key.lm { background: rgba(255,217,61,0.15); color: #ffd93d; border-color: rgba(255,217,61,0.3); }
+  .key.li { background: rgba(83,215,105,0.15); color: #53d769; border-color: rgba(83,215,105,0.3); }
+  .key.ri { background: rgba(78,205,196,0.15); color: #4ecdc4; border-color: rgba(78,205,196,0.3); }
+  .key.rm { background: rgba(69,183,209,0.15); color: #45b7d1; border-color: rgba(69,183,209,0.3); }
+  .key.rr { background: rgba(155,89,182,0.15); color: #9b59b6; border-color: rgba(155,89,182,0.3); }
+  .key.rp { background: rgba(232,67,147,0.15); color: #e84393; border-color: rgba(232,67,147,0.3); }
+  .key.space { width: 180px; }
+  .key.active { transform: scale(1.2); box-shadow: 0 0 16px currentColor; border-color: currentColor; }
+  .key.dimmed { opacity: 0.25; }
+
+  /* Overlay screens */
+  .overlay { position: absolute; inset: 0; background: rgba(10,10,30,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+  .overlay.hidden { display: none; }
+  .overlay h1 { font-size: 28px; margin-bottom: 8px; color: #00d2ff; }
+  .overlay h2 { font-size: 18px; margin-bottom: 20px; color: #a0a0c0; font-weight: 400; }
+  .overlay .stats { display: flex; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+  .overlay .stat { text-align: center; }
+  .overlay .stat-value { font-size: 32px; font-weight: 900; }
+  .overlay .stat-label { font-size: 11px; color: #a0a0c0; margin-top: 2px; }
+  .overlay .finger-bars { display: flex; gap: 6px; align-items: flex-end; margin-bottom: 24px; }
+  .overlay .finger-bar { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .overlay .finger-bar-fill { width: 28px; border-radius: 3px 3px 0 0; transition: height 0.5s; }
+  .overlay .finger-bar-label { font-size: 10px; color: #a0a0c0; }
+  .btn { padding: 12px 32px; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
+  .btn:hover { transform: scale(1.05); }
+  .btn-primary { background: #00d2ff; color: #1a1a2e; }
+  .btn-primary:active { transform: scale(0.98); }
+  .start-hint { font-size: 13px; color: #a0a0c0; margin-top: 16px; }
+  .start-hint kbd { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+</style>
+</head>
+<body>
+
+<!-- HUD -->
+<div class="hud">
+  <div class="hud-score" id="score">SCORE: 0</div>
+  <div class="hud-lesson" id="hudLesson">WORLD: <span>基准键 Home Row</span></div>
+  <div class="hud-combo inactive" id="combo">x0</div>
+</div>
+
+<!-- Game Canvas -->
+<div class="canvas-wrap">
+  <canvas id="game"></canvas>
+  <div class="prompt" id="prompt"></div>
+
+  <!-- Start Screen -->
+  <div class="overlay" id="startScreen">
+    <h1>键盘跑酷</h1>
+    <h2>Keyboard Runner</h2>
+    <p style="color:#a0a0c0; margin-bottom:16px; font-size:13px; text-align:center; max-width:400px; line-height:1.5;">
+      用正确的手指按下对应的键，跳过障碍<br>
+      准确率 ≥ 60% 解锁下一关
+    </p>
+    <div id="levelSelect" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px; max-height:260px; overflow-y:auto; width:340px;"></div>
+    <div class="start-hint">按数字键 <kbd>1</kbd>-<kbd>6</kbd> 快速选择</div>
+  </div>
+
+  <!-- End Screen -->
+  <div class="overlay hidden" id="endScreen">
+    <h1 id="endTitle">运行结束 Run Complete</h1>
+    <div class="stats" id="endStats"></div>
+    <div class="finger-bars" id="fingerBars"></div>
+    <div style="display:flex; gap:12px; margin-top:8px;">
+      <button class="btn btn-primary" id="btnRetry" onclick="startGame()">再来一次 Retry</button>
+      <button class="btn btn-primary" id="btnNext" onclick="goNextLevel()" style="background:#53d769;display:none;">下一关 Next</button>
+      <button class="btn btn-primary" id="btnMenu" onclick="showMenu()" style="background:#9b59b6;">选关 Menu</button>
+    </div>
+    <div class="start-hint">or press <kbd>Space</kbd></div>
+  </div>
+</div>
+
+<!-- On-screen Keyboard -->
+<div class="keyboard" id="keyboard"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// DATA: Finger zones, key mappings, lessons
+// ═══════════════════════════════════════════
+
+const FINGER_ZONES = {
+  lp: { name: '左小指 L-Pinky',  keys: ['a','q','z','1'], color: '#ff6b6b' },
+  lr: { name: '左无名指 L-Ring',  keys: ['s','w','x','2'], color: '#ffa06b' },
+  lm: { name: '左中指 L-Mid',    keys: ['d','e','c','3'], color: '#ffd93d' },
+  li: { name: '左食指 L-Index',  keys: ['f','r','v','4','5','g','t','b'], color: '#53d769' },
+  ri: { name: '右食指 R-Index',  keys: ['h','y','n','6','7','j','u','m'], color: '#4ecdc4' },
+  rm: { name: '右中指 R-Mid',    keys: ['k','i',',','8'], color: '#45b7d1' },
+  rr: { name: '右无名指 R-Ring',  keys: ['l','o','.','9'], color: '#9b59b6' },
+  rp: { name: '右小指 R-Pinky',  keys: [';','p','/','0'], color: '#e84393' },
+};
+
+// Build reverse map: key → { zone, color, name }
+const KEY_MAP = {};
+for (const [zone, data] of Object.entries(FINGER_ZONES)) {
+  for (const key of data.keys) {
+    KEY_MAP[key] = { zone, color: data.color, name: data.name };
+  }
+}
+
+const LESSONS = [
+  { id: 'home-row',   name: '基准键 Home Row',       keys: ['a','s','d','f','j','k','l',';'],              duration: 60, speed: 1.5, bg1: '#2d5a3d', bg2: '#3a7a4a', ground: '#53d769' },
+  { id: 'home-top',   name: '基准+上排 Top+Home',     keys: ['a','s','d','f','j','k','l',';','e','i'],      duration: 60, speed: 1.6, bg1: '#3a2d5a', bg2: '#4a3a7a', ground: '#9b59b6' },
+  { id: 'top-row',    name: '上排键 Top Row',          keys: ['q','w','e','r','t','y','u','i','o','p'],      duration: 60, speed: 1.7, bg1: '#5a3a2d', bg2: '#7a4a3a', ground: '#ffa06b' },
+  { id: 'home-top-full', name: '基准+上排综合 Full',   keys: ['a','s','d','f','j','k','l',';','q','w','e','r','t','y','u','i','o','p'], duration: 70, speed: 1.8, bg1: '#2d4a5a', bg2: '#3a6a7a', ground: '#45b7d1' },
+  { id: 'bottom-row', name: '下排键 Bottom Row',       keys: ['z','x','c','v','b','n','m',',','.','/'],     duration: 60, speed: 1.7, bg1: '#5a2d3a', bg2: '#7a3a4a', ground: '#e84393' },
+  { id: 'all-rows',   name: '全键盘 Full Keyboard',    keys: ['a','s','d','f','j','k','l',';','q','w','e','r','t','y','u','i','o','p','z','x','c','v','b','n','m',',','.','/'], duration: 90, speed: 2.0, bg1: '#1a3a1a', bg2: '#2a5a2a', ground: '#00d2ff' },
+];
+
+let currentLessonIndex = 0;
+function currentLesson() { return LESSONS[currentLessonIndex]; }
+
+// Progress persistence
+function loadProgress() {
+  try {
+    const data = JSON.parse(localStorage.getItem('kb-runner-progress') || '{}');
+    return { unlocked: data.unlocked || 1, bestAccuracy: data.bestAccuracy || {} };
+  } catch { return { unlocked: 1, bestAccuracy: {} }; }
+}
+function saveProgress(progress) {
+  try { localStorage.setItem('kb-runner-progress', JSON.stringify(progress)); } catch {}
+}
+function unlockNext(lessonIndex, accuracy) {
+  const progress = loadProgress();
+  progress.bestAccuracy[lessonIndex] = Math.max(accuracy, progress.bestAccuracy[lessonIndex] || 0);
+  if (accuracy >= 60 && lessonIndex + 2 > progress.unlocked) {
+    progress.unlocked = Math.min(lessonIndex + 2, LESSONS.length);
+  }
+  saveProgress(progress);
+}
+
+// Keyboard layout for on-screen rendering
+const KB_ROWS = [
+  ['1','2','3','4','5','6','7','8','9','0'],
+  ['q','w','e','r','t','y','u','i','o','p'],
+  ['a','s','d','f','g','h','j','k','l',';'],
+  ['z','x','c','v','b','n','m',',','.','/'],
+];
+
+// ═══════════════════════════════════════════
+// GAME STATE
+// ═══════════════════════════════════════════
+
+let canvas, ctx;
+let state = 'idle'; // idle | playing | ended
+let score = 0;
+let combo = 0;
+let maxCombo = 0;
+let timeLeft = 60;
+let runner = { x: 0, y: 0, vy: 0, jumping: false, stumbling: false, stumbleTimer: 0 };
+let obstacles = [];
+let nextObstacleIn = 60;
+let scrollOffset = 0;
+let groundY = 0;
+let fingerStats = {};
+let lastTime = 0;
+let activeKey = null;
+let activeKeyTimer = 0;
+let particles = [];
+
+function resetState() {
+  score = 0; combo = 0; maxCombo = 0;
+  timeLeft = currentLesson().duration;
+  obstacles = [];
+  nextObstacleIn = 80;
+  scrollOffset = 0;
+  activeKey = null;
+  activeKeyTimer = 0;
+  particles = [];
+  fingerStats = {};
+  for (const zone of Object.keys(FINGER_ZONES)) {
+    fingerStats[zone] = { hits: 0, misses: 0 };
+  }
+  runner = { x: 0, y: 0, vy: 0, jumping: false, stumbling: false, stumbleTimer: 0 };
+}
+
+// ═══════════════════════════════════════════
+// CANVAS SETUP
+// ═══════════════════════════════════════════
+
+function initCanvas() {
+  canvas = document.getElementById('game');
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  ctx = canvas.getContext('2d');
+  groundY = canvas.height * 0.78;
+  runner.x = canvas.width * 0.15;
+  runner.y = groundY;
+}
+
+// ═══════════════════════════════════════════
+// ON-SCREEN KEYBOARD
+// ═══════════════════════════════════════════
+
+function buildKeyboard() {
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  for (const row of KB_ROWS) {
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'kb-row';
+    for (const key of row) {
+      const keyDiv = document.createElement('div');
+      const info = KEY_MAP[key];
+      const isActive = currentLesson().keys.includes(key);
+      keyDiv.className = 'key ' + (info ? info.zone : '') + (!isActive ? ' dimmed' : '');
+      keyDiv.textContent = key === ';' ? ';' : key.toUpperCase();
+      keyDiv.id = 'key-' + key;
+      rowDiv.appendChild(keyDiv);
+    }
+    kb.appendChild(rowDiv);
+  }
+  // Space bar
+  const spaceRow = document.createElement('div');
+  spaceRow.className = 'kb-row';
+  const spaceKey = document.createElement('div');
+  spaceKey.className = 'key space dimmed';
+  spaceKey.textContent = 'SPACE';
+  spaceRow.appendChild(spaceKey);
+  kb.appendChild(spaceRow);
+}
+
+function highlightKey(key) {
+  // Remove previous highlight
+  if (activeKey) {
+    const prev = document.getElementById('key-' + activeKey);
+    if (prev) prev.classList.remove('active');
+  }
+  activeKey = key;
+  activeKeyTimer = 15;
+  const el = document.getElementById('key-' + key);
+  if (el) el.classList.add('active');
+}
+
+function clearHighlight() {
+  if (activeKey) {
+    const el = document.getElementById('key-' + activeKey);
+    if (el) el.classList.remove('active');
+    activeKey = null;
+  }
+}
+
+// ═══════════════════════════════════════════
+// OBSTACLE GENERATION
+// ═══════════════════════════════════════════
+
+function spawnObstacle() {
+  const key = currentLesson().keys[Math.floor(Math.random() * currentLesson().keys.length)];
+  const info = KEY_MAP[key];
+  obstacles.push({
+    x: canvas.width + 40,
+    key,
+    zone: info.zone,
+    color: info.color,
+    name: info.name,
+    width: 50,
+    height: 60,
+    cleared: false,
+  });
+  nextObstacleIn = 60 + Math.floor(Math.random() * 40); // frames between obstacles
+}
+
+// ═══════════════════════════════════════════
+// PARTICLES
+// ═══════════════════════════════════════════
+
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 4,
+      vy: -Math.random() * 3 - 1,
+      life: 20 + Math.random() * 15,
+      color,
+      size: 2 + Math.random() * 3,
+    });
+  }
+}
+
+// ═══════════════════════════════════════════
+// INPUT HANDLING
+// ═══════════════════════════════════════════
+
+function handleInput(key) {
+  if (state !== 'playing') return;
+
+  // Find the nearest uncleared obstacle
+  const nextObs = obstacles.find(o => !o.cleared && o.x > runner.x - 20);
+  if (!nextObs) return;
+
+  highlightKey(key);
+
+  if (key === nextObs.key) {
+    // Correct key → jump
+    nextObs.cleared = true;
+    score++;
+    combo++;
+    if (combo > maxCombo) maxCombo = combo;
+    fingerStats[nextObs.zone].hits++;
+    runner.jumping = true;
+    runner.vy = -8;
+    spawnParticles(nextObs.x, groundY - 40, nextObs.color, 8);
+    updateHUD();
+    updatePrompt(nextObs);
+  } else {
+    // Wrong key → stumble
+    combo = 0;
+    fingerStats[nextObs.zone].misses++;
+    runner.stumbling = true;
+    runner.stumbleTimer = 12;
+    spawnParticles(runner.x + 20, groundY - 20, '#ff4444', 4);
+    updateHUD();
+  }
+}
+
+// Physical key code → logical key (IME-independent)
+const CODE_TO_KEY = {
+  'Semicolon': ';', 'Comma': ',', 'Period': '.', 'Slash': '/',
+  'Digit1': '1', 'Digit2': '2', 'Digit3': '3', 'Digit4': '4', 'Digit5': '5',
+  'Digit6': '6', 'Digit7': '7', 'Digit8': '8', 'Digit9': '9', 'Digit0': '0',
+  'KeyA': 'a', 'KeyB': 'b', 'KeyC': 'c', 'KeyD': 'd', 'KeyE': 'e', 'KeyF': 'f',
+  'KeyG': 'g', 'KeyH': 'h', 'KeyI': 'i', 'KeyJ': 'j', 'KeyK': 'k', 'KeyL': 'l',
+  'KeyM': 'm', 'KeyN': 'n', 'KeyO': 'o', 'KeyP': 'p', 'KeyQ': 'q', 'KeyR': 'r',
+  'KeyS': 's', 'KeyT': 't', 'KeyU': 'u', 'KeyV': 'v', 'KeyW': 'w', 'KeyX': 'x',
+  'KeyY': 'y', 'KeyZ': 'z', 'Space': ' ',
+};
+
+function normalizeKey(e) {
+  // Prefer physical key code (immune to IME/full-width input)
+  if (CODE_TO_KEY[e.code]) return CODE_TO_KEY[e.code];
+  // Fallback to e.key with full-width → half-width normalization
+  let key = e.key.toLowerCase();
+  key = key.replace(/；/g, ';').replace(/，/g, ',').replace(/。/g, '.').replace(/／/g, '/');
+  return key;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  const key = normalizeKey(e);
+
+  if (key === ' ') {
+    e.preventDefault();
+    if (state === 'idle') {
+      // Start first unlocked level
+      const progress = loadProgress();
+      currentLessonIndex = Math.min(progress.unlocked - 1, LESSONS.length - 1);
+      startGame();
+    } else if (state === 'ended') {
+      startGame();
+    }
+    return;
+  }
+
+  // Number keys 1-6 for level select on idle screen
+  if (state === 'idle') {
+    const num = parseInt(key);
+    if (num >= 1 && num <= LESSONS.length) {
+      const progress = loadProgress();
+      if (num <= progress.unlocked) {
+        currentLessonIndex = num - 1;
+        startGame();
+      }
+    }
+    return;
+  }
+
+  if (state === 'playing') {
+    e.preventDefault();
+    handleInput(key);
+  }
+});
+
+// ═══════════════════════════════════════════
+// HUD
+// ═══════════════════════════════════════════
+
+function updateHUD() {
+  document.getElementById('score').textContent = 'SCORE: ' + score;
+  const comboEl = document.getElementById('combo');
+  comboEl.textContent = 'x' + combo;
+  comboEl.classList.toggle('inactive', combo === 0);
+}
+
+function updatePrompt(obs) {
+  const prompt = document.getElementById('prompt');
+  const info = KEY_MAP[obs.key];
+  prompt.textContent = '按 ' + obs.key.toUpperCase() + ' — ' + info.name;
+  prompt.style.color = info.color;
+}
+
+function showNextPrompt() {
+  const nextObs = obstacles.find(o => !o.cleared && o.x > runner.x - 20);
+  if (nextObs) {
+    updatePrompt(nextObs);
+  } else {
+    document.getElementById('prompt').textContent = '';
+  }
+}
+
+// ═══════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════
+
+function drawBackground() {
+  const lesson = currentLesson();
+  // Gradient sky with level-themed colors
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, '#0a0a23');
+  grad.addColorStop(0.5, '#1a1a3e');
+  grad.addColorStop(0.78, lesson.bg1);
+  grad.addColorStop(1, lesson.bg2);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Stars
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  for (let i = 0; i < 30; i++) {
+    const sx = (i * 137.5 + scrollOffset * 0.1) % canvas.width;
+    const sy = (i * 73.3) % (groundY - 40);
+    ctx.fillRect(sx, sy, 1.5, 1.5);
+  }
+
+  // Ground
+  ctx.fillStyle = lesson.bg1;
+  ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+  ctx.fillStyle = lesson.ground;
+  ctx.globalAlpha = 0.4;
+  ctx.fillRect(0, groundY, canvas.width, 2);
+  ctx.globalAlpha = 1;
+
+  // Ground texture lines
+  ctx.strokeStyle = lesson.ground + '26'; // 15% alpha hex
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 20; i++) {
+    const gx = ((i * 80 - scrollOffset * 0.8) % (canvas.width + 80) + canvas.width + 80) % (canvas.width + 80) - 40;
+    ctx.beginPath();
+    ctx.moveTo(gx, groundY + 8);
+    ctx.lineTo(gx + 30, groundY + 8);
+    ctx.stroke();
+  }
+}
+
+function drawRunner() {
+  const r = runner;
+  const baseY = r.jumping ? r.y : groundY;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(r.x + 15, groundY + 4, 16, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Stumble shake
+  let shakeX = 0, shakeR = 0;
+  if (r.stumbling) {
+    shakeX = Math.sin(r.stumbleTimer * 2) * 4;
+    shakeR = Math.sin(r.stumbleTimer * 3) * 0.1;
+  }
+
+  const cx = r.x + 15 + shakeX;
+  const bodyColor = r.stumbling ? '#ff4444' : '#4ecdc4';
+
+  ctx.save();
+  ctx.translate(cx, baseY);
+  ctx.rotate(shakeR);
+
+  // Legs (behind body) - running animation
+  const legPhase = r.jumping ? -0.3 : scrollOffset * 0.15;
+  ctx.strokeStyle = bodyColor;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  // Left leg
+  ctx.beginPath();
+  ctx.moveTo(-5, -16);
+  ctx.lineTo(-7 + Math.sin(legPhase) * 6, -1);
+  ctx.stroke();
+  // Right leg
+  ctx.beginPath();
+  ctx.moveTo(5, -16);
+  ctx.lineTo(7 - Math.sin(legPhase) * 6, -1);
+  ctx.stroke();
+  // Shoes
+  ctx.fillStyle = '#ffd93d';
+  ctx.beginPath();
+  ctx.ellipse(-7 + Math.sin(legPhase) * 6, -1, 5, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(7 - Math.sin(legPhase) * 6, -1, 5, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body (rounded rectangle)
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath();
+  ctx.roundRect(-10, -42, 20, 28, 6);
+  ctx.fill();
+  // Body highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath();
+  ctx.roundRect(-7, -40, 8, 24, 4);
+  ctx.fill();
+
+  // Arms
+  ctx.strokeStyle = bodyColor;
+  ctx.lineWidth = 4;
+  const armPhase = r.jumping ? -1.2 : scrollOffset * 0.15 + Math.PI;
+  // Left arm
+  ctx.beginPath();
+  ctx.moveTo(-9, -34);
+  ctx.lineTo(-14 + Math.sin(armPhase) * 4, -22);
+  ctx.stroke();
+  // Right arm
+  ctx.beginPath();
+  ctx.moveTo(9, -34);
+  ctx.lineTo(14 - Math.sin(armPhase) * 4, -22);
+  ctx.stroke();
+  // Hands (circles)
+  ctx.fillStyle = '#ffd93d';
+  ctx.beginPath();
+  ctx.arc(-14 + Math.sin(armPhase) * 4, -22, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(14 - Math.sin(armPhase) * 4, -22, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Head (larger, more cartoon)
+  ctx.fillStyle = '#ffd93d';
+  ctx.beginPath();
+  ctx.arc(0, -54, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#e6c235';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Hair tuft
+  ctx.strokeStyle = '#e6c235';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-2, -67);
+  ctx.quadraticCurveTo(2, -73, 6, -68);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(2, -67);
+  ctx.quadraticCurveTo(0, -75, -4, -70);
+  ctx.stroke();
+
+  // Eyes (cartoon style with whites)
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(-5, -56, 4.5, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(5, -56, 4.5, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Pupils
+  ctx.fillStyle = '#333';
+  const pupilOff = r.stumbling ? 0 : 1;
+  ctx.beginPath();
+  ctx.arc(-4 + pupilOff, -55, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(6 + pupilOff, -55, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Eye shine
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(-3 + pupilOff, -56.5, 1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(7 + pupilOff, -56.5, 1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Mouth
+  if (r.stumbling) {
+    // X mouth when stumbling
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-3, -48);
+    ctx.lineTo(3, -46);
+    ctx.moveTo(3, -48);
+    ctx.lineTo(-3, -46);
+    ctx.stroke();
+  } else if (r.jumping) {
+    // Open mouth when jumping
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.ellipse(0, -47, 3, 2.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Smile
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, -49, 4, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+  }
+
+  // Cheek blush
+  ctx.fillStyle = 'rgba(255,107,107,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(-10, -50, 3, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(10, -50, 3, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawObstacles() {
+  for (const obs of obstacles) {
+    if (obs.x < -60 || obs.cleared) continue;
+
+    const info = KEY_MAP[obs.key];
+
+    // Post
+    ctx.fillStyle = '#555';
+    ctx.fillRect(obs.x + 22, groundY - 50, 6, 50);
+
+    // Key label box
+    const boxY = groundY - 80;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.strokeStyle = info.color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.roundRect(obs.x, boxY, 50, 30, 6);
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Key letter
+    ctx.fillStyle = info.color;
+    ctx.font = 'bold 20px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(obs.key === ';' ? ';' : obs.key.toUpperCase(), obs.x + 25, boxY + 15);
+
+    // Finger name below
+    ctx.fillStyle = info.color;
+    ctx.globalAlpha = 0.6;
+    ctx.font = '9px -apple-system, system-ui, sans-serif';
+    ctx.fillText(info.name.split(' ')[0], obs.x + 25, boxY + 38);
+    ctx.globalAlpha = 1;
+  }
+  ctx.textAlign = 'start';
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life / 35;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawTimeBar() {
+  const pct = timeLeft / currentLesson().duration;
+  const barW = canvas.width * pct;
+  ctx.fillStyle = pct > 0.3 ? '#00d2ff' : '#ff6b6b';
+  ctx.fillRect(0, 0, barW, 3);
+}
+
+// ═══════════════════════════════════════════
+// GAME LOOP
+// ═══════════════════════════════════════════
+
+function update(dt) {
+  if (state !== 'playing') return;
+
+  // Timer
+  timeLeft -= dt;
+  if (timeLeft <= 0) {
+    timeLeft = 0;
+    endGame();
+    return;
+  }
+
+  // Scroll
+  scrollOffset += currentLesson().speed;
+
+  // Runner physics
+  if (runner.jumping) {
+    runner.vy += 0.4; // gravity
+    runner.y += runner.vy;
+    if (runner.y >= groundY) {
+      runner.y = groundY;
+      runner.jumping = false;
+      runner.vy = 0;
+    }
+  }
+  if (runner.stumbling) {
+    runner.stumbleTimer--;
+    if (runner.stumbleTimer <= 0) runner.stumbling = false;
+  }
+
+  // Spawn obstacles
+  nextObstacleIn--;
+  if (nextObstacleIn <= 0) {
+    spawnObstacle();
+  }
+
+  // Move obstacles
+  for (const obs of obstacles) {
+    obs.x -= currentLesson().speed;
+  }
+
+  // Remove off-screen obstacles (missed ones)
+  for (const obs of obstacles) {
+    if (!obs.cleared && obs.x < runner.x - 30) {
+      obs.cleared = true; // missed
+      fingerStats[obs.zone].misses++;
+      combo = 0;
+      updateHUD();
+    }
+  }
+
+  // Clean up old obstacles
+  obstacles = obstacles.filter(o => o.x > -100);
+
+  // Update particles
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15;
+    p.life--;
+  }
+  particles = particles.filter(p => p.life > 0);
+
+  // Key highlight timer
+  if (activeKeyTimer > 0) {
+    activeKeyTimer--;
+    if (activeKeyTimer <= 0) clearHighlight();
+  }
+
+  // Update prompt
+  showNextPrompt();
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground();
+  drawObstacles();
+  drawRunner();
+  drawParticles();
+  drawTimeBar();
+}
+
+function gameLoop(timestamp) {
+  if (!lastTime) lastTime = timestamp;
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  update(dt);
+  render();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ═══════════════════════════════════════════
+// GAME FLOW
+// ═══════════════════════════════════════════
+
+function startGame() {
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('endScreen').classList.add('hidden');
+  resetState();
+  initCanvas();
+  buildKeyboard();
+  state = 'playing';
+  updateHUD();
+  document.getElementById('hudLesson').querySelector('span').textContent = currentLesson().name;
+  document.getElementById('prompt').textContent = '';
+}
+
+function endGame() {
+  state = 'ended';
+  clearHighlight();
+  document.getElementById('prompt').textContent = '';
+  showEndScreen();
+}
+
+function showEndScreen() {
+  const endScreen = document.getElementById('endScreen');
+  endScreen.classList.remove('hidden');
+
+  // Calculate stats
+  let totalHits = 0, totalAttempts = 0;
+  for (const stats of Object.values(fingerStats)) {
+    totalHits += stats.hits;
+    totalAttempts += stats.hits + stats.misses;
+  }
+  const accuracy = totalAttempts > 0 ? Math.round((totalHits / totalAttempts) * 100) : 0;
+
+  // Save progress and unlock next level
+  unlockNext(currentLessonIndex, accuracy);
+
+  // Title
+  const title = document.getElementById('endTitle');
+  if (accuracy >= 60) {
+    title.textContent = '通关成功 Level Complete!';
+    title.style.color = '#53d769';
+  } else {
+    title.textContent = '继续加油 Keep Going!';
+    title.style.color = '#ffa06b';
+  }
+
+  // Show/hide next level button
+  const btnNext = document.getElementById('btnNext');
+  const hasNext = accuracy >= 60 && currentLessonIndex < LESSONS.length - 1;
+  btnNext.style.display = hasNext ? 'inline-block' : 'none';
+
+  // Stats display
+  const statsDiv = document.getElementById('endStats');
+  statsDiv.innerHTML = `
+    <div class="stat"><div class="stat-value" style="color:#00d2ff">${score}</div><div class="stat-label">得分 Score</div></div>
+    <div class="stat"><div class="stat-value" style="color:#53d769">${accuracy}%</div><div class="stat-label">准确率 Accuracy</div></div>
+    <div class="stat"><div class="stat-value" style="color:#ff6b6b">x${maxCombo}</div><div class="stat-label">最大连击 Max Combo</div></div>
+  `;
+
+  // Finger accuracy bars
+  const barsDiv = document.getElementById('fingerBars');
+  barsDiv.innerHTML = '';
+  const lessonZones = [...new Set(currentLesson().keys.map(k => KEY_MAP[k]?.zone).filter(Boolean))];
+
+  for (const zone of lessonZones) {
+    const stats = fingerStats[zone];
+    const total = stats.hits + stats.misses;
+    const pct = total > 0 ? Math.round((stats.hits / total) * 100) : 0;
+    const color = FINGER_ZONES[zone].color;
+
+    const barDiv = document.createElement('div');
+    barDiv.className = 'finger-bar';
+    barDiv.innerHTML = `
+      <div class="finger-bar-fill" style="background:${color}; height:${Math.max(pct, 4)}px;"></div>
+      <div class="finger-bar-label" style="color:${color}">${pct}%</div>
+    `;
+    barsDiv.appendChild(barDiv);
+  }
+}
+
+function goNextLevel() {
+  if (currentLessonIndex < LESSONS.length - 1) {
+    currentLessonIndex++;
+    startGame();
+  }
+}
+
+function showMenu() {
+  document.getElementById('endScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+  buildLevelSelect();
+}
+
+function selectLevel(index) {
+  currentLessonIndex = index;
+  startGame();
+}
+
+function buildLevelSelect() {
+  const container = document.getElementById('levelSelect');
+  container.innerHTML = '';
+  const progress = loadProgress();
+
+  LESSONS.forEach((lesson, i) => {
+    const unlocked = i < progress.unlocked;
+    const best = progress.bestAccuracy[i];
+    const btn = document.createElement('button');
+    btn.className = 'btn ' + (unlocked ? 'btn-primary' : '');
+    btn.style.cssText = unlocked
+      ? 'width:100%; text-align:left; padding:10px 16px; font-size:14px; display:flex; justify-content:space-between; align-items:center;'
+      : 'width:100%; text-align:left; padding:10px 16px; font-size:14px; display:flex; justify-content:space-between; align-items:center; background:#333; color:#666; cursor:not-allowed; opacity:0.5;';
+    btn.innerHTML = `
+      <span><strong>${i + 1}.</strong> ${lesson.name}</span>
+      <span style="font-size:12px;">${best != null ? 'Best: ' + best + '%' : (unlocked ? '开始 →' : '🔒')}</span>
+    `;
+    if (unlocked) btn.onclick = () => selectLevel(i);
+    container.appendChild(btn);
+  });
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+
+window.addEventListener('load', () => {
+  initCanvas();
+  buildKeyboard();
+  buildLevelSelect();
+  lastTime = 0;
+  requestAnimationFrame(gameLoop);
+});
+
+window.addEventListener('resize', () => {
+  initCanvas();
+});
+</script>
+
+</body>
+</html>

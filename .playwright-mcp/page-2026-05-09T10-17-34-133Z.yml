@@ -1,0 +1,89 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]: "SCORE: 0"
+    - generic [ref=e4]: "WORLD: 基准键 Home Row"
+    - generic [ref=e5]: x0
+  - generic [ref=e8]:
+    - heading "键盘跑酷" [level=1] [ref=e9]
+    - heading "Keyboard Runner" [level=2] [ref=e10]
+    - paragraph [ref=e11]:
+      - text: 用正确的手指按下对应的键，跳过障碍
+      - text: 准确率 ≥ 60% 解锁下一关
+    - generic [ref=e12]:
+      - button "1. 基准键 Home Row 开始 →" [ref=e13] [cursor=pointer]:
+        - generic [ref=e14]:
+          - strong [ref=e15]: "1."
+          - text: 基准键 Home Row
+        - generic [ref=e16]: 开始 →
+      - button "2. 基准+上排 Top+Home 🔒" [ref=e17]:
+        - generic [ref=e18]:
+          - strong [ref=e19]: "2."
+          - text: 基准+上排 Top+Home
+        - generic [ref=e20]: 🔒
+      - button "3. 上排键 Top Row 🔒" [ref=e21]:
+        - generic [ref=e22]:
+          - strong [ref=e23]: "3."
+          - text: 上排键 Top Row
+        - generic [ref=e24]: 🔒
+      - button "4. 基准+上排综合 Full 🔒" [ref=e25]:
+        - generic [ref=e26]:
+          - strong [ref=e27]: "4."
+          - text: 基准+上排综合 Full
+        - generic [ref=e28]: 🔒
+      - button "5. 下排键 Bottom Row 🔒" [ref=e29]:
+        - generic [ref=e30]:
+          - strong [ref=e31]: "5."
+          - text: 下排键 Bottom Row
+        - generic [ref=e32]: 🔒
+      - button "6. 全键盘 Full Keyboard 🔒" [ref=e33]:
+        - generic [ref=e34]:
+          - strong [ref=e35]: "6."
+          - text: 全键盘 Full Keyboard
+        - generic [ref=e36]: 🔒
+    - generic [ref=e37]: 按数字键 1-6 快速选择
+  - generic [ref=e38]:
+    - generic [ref=e39]:
+      - generic [ref=e40]: "1"
+      - generic [ref=e41]: "2"
+      - generic [ref=e42]: "3"
+      - generic [ref=e43]: "4"
+      - generic [ref=e44]: "5"
+      - generic [ref=e45]: "6"
+      - generic [ref=e46]: "7"
+      - generic [ref=e47]: "8"
+      - generic [ref=e48]: "9"
+      - generic [ref=e49]: "0"
+    - generic [ref=e50]:
+      - generic [ref=e51]: Q
+      - generic [ref=e52]: W
+      - generic [ref=e53]: E
+      - generic [ref=e54]: R
+      - generic [ref=e55]: T
+      - generic [ref=e56]: "Y"
+      - generic [ref=e57]: U
+      - generic [ref=e58]: I
+      - generic [ref=e59]: O
+      - generic [ref=e60]: P
+    - generic [ref=e61]:
+      - generic [ref=e62]: A
+      - generic [ref=e63]: S
+      - generic [ref=e64]: D
+      - generic [ref=e65]: F
+      - generic [ref=e66]: G
+      - generic [ref=e67]: H
+      - generic [ref=e68]: J
+      - generic [ref=e69]: K
+      - generic [ref=e70]: L
+      - generic [ref=e71]: ;
+    - generic [ref=e72]:
+      - generic [ref=e73]: Z
+      - generic [ref=e74]: X
+      - generic [ref=e75]: C
+      - generic [ref=e76]: V
+      - generic [ref=e77]: B
+      - generic [ref=e78]: "N"
+      - generic [ref=e79]: M
+      - generic [ref=e80]: ","
+      - generic [ref=e81]: .
+      - generic [ref=e82]: /
+    - generic [ref=e84]: SPACE
