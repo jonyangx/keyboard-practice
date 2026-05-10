@@ -13,8 +13,9 @@
   .hud-score { font-size: 16px; font-weight: 700; color: #00d2ff; }
   .hud-lesson { font-size: 13px; color: #a0a0c0; }
   .hud-lesson span { color: #53d769; font-weight: 600; }
-  .hud-combo { font-size: 20px; font-weight: 900; color: #ff6b6b; text-shadow: 0 0 10px rgba(255,107,107,0.5); }
-  .hud-combo.inactive { opacity: 0.3; }
+.hud-combo { font-size: 20px; font-weight: 900; color: #ff6b6b; text-shadow: 0 0 10px rgba(255,107,107,0.5); }
+.hud-combo.inactive { opacity: 0.3; }
+.hud-speed { font-size: 12px; color: #ffd93d; margin-left: 12px; }
 
   /* Canvas */
   .canvas-wrap { flex: 1; position: relative; min-height: 200px; }
@@ -66,13 +67,26 @@
 <div class="hud">
   <div class="hud-score" id="score">SCORE: 0</div>
   <div class="hud-lesson" id="hudLesson">WORLD: <span>基准键 Home Row</span></div>
-  <div class="hud-combo inactive" id="combo">x0</div>
+  <div>
+    <div class="hud-combo inactive" id="combo">x0</div>
+    <div class="hud-speed" id="speedIndicator">1.0x</div>
+  </div>
 </div>
 
 <!-- Game Canvas -->
 <div class="canvas-wrap">
   <canvas id="game"></canvas>
   <div class="prompt" id="prompt"></div>
+
+  <!-- Pause Screen -->
+  <div class="overlay hidden" id="pauseScreen">
+    <h1>暂停 Paused</h1>
+    <div style="display:flex; gap:12px; margin-top:24px;">
+      <button class="btn btn-primary" onclick="resumeGame()">继续 Resume</button>
+      <button class="btn btn-primary" onclick="showMenu()" style="background:#9b59b6;">选关 Menu</button>
+    </div>
+    <div class="start-hint">按 <kbd>Esc</kbd> 继续</div>
+  </div>
 
   <!-- Start Screen -->
   <div class="overlay" id="startScreen">
@@ -170,22 +184,93 @@ const KB_ROWS = [
 // GAME STATE
 // ═══════════════════════════════════════════
 
-let canvas, ctx;
-let state = 'idle'; // idle | playing | ended
 let score = 0;
 let combo = 0;
-let maxCombo = 0;
-let timeLeft = 60;
-let runner = { x: 0, y: 0, vy: 0, jumping: false, stumbling: false, stumbleTimer: 0 };
-let obstacles = [];
-let nextObstacleIn = 60;
+let paused = false;
+let gameOver = false;
+let gameStarted = false;
+let lastTime = 0;
 let scrollOffset = 0;
 let groundY = 0;
+
+// Performance: cache DOM references
+const DOM = {};
+function initDOM() {
+  DOM.score = document.getElementById('score');
+  DOM.combo = document.getElementById('combo');
+  DOM.hudLesson = document.getElementById('hudLesson');
+  DOM.prompt = document.getElementById('prompt');
+  DOM.startScreen = document.getElementById('startScreen');
+  DOM.endScreen = document.getElementById('endScreen');
+  DOM.levelSelect = document.getElementById('levelSelect');
+  DOM.endStats = document.getElementById('endStats');
+  DOM.fingerBars = document.getElementById('fingerBars');
+  DOM.keyboard = document.getElementById('keyboard');
+  DOM.canvas = document.getElementById('game');
+  DOM.speedIndicator = document.getElementById('speedIndicator');
+}
+
+// Performance: cache gradient objects
+let cachedGradient = null;
+let lastLessonId = null;
+
+// Audio: simple Web Audio API sound effects
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+let audioEnabled = true;
+
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playSound(type) {
+  if (!audioEnabled || !audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  const now = audioCtx.currentTime;
+  if (type === 'key') {
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  } else if (type === 'jump') {
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  } else if (type === 'hit') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.2);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  } else if (type === 'combo') {
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.setValueAtTime(1000, now + 0.05);
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+}
 let fingerStats = {};
 let lastTime = 0;
 let activeKey = null;
 let activeKeyTimer = 0;
 let particles = [];
+let speedMultiplier = 1; // Progressive speed increase
 
 function resetState() {
   score = 0; combo = 0; maxCombo = 0;
@@ -196,6 +281,7 @@ function resetState() {
   activeKey = null;
   activeKeyTimer = 0;
   particles = [];
+  speedMultiplier = 1;
   fingerStats = {};
   for (const zone of Object.keys(FINGER_ZONES)) {
     fingerStats[zone] = { hits: 0, misses: 0 };
@@ -312,6 +398,7 @@ function spawnParticles(x, y, color, count) {
 
 function handleInput(key) {
   if (state !== 'playing') return;
+  initAudio();
 
   // Find the nearest uncleared obstacle
   const nextObs = obstacles.find(o => !o.cleared && o.x > runner.x - 20);
@@ -323,12 +410,15 @@ function handleInput(key) {
     // Correct key → jump
     nextObs.cleared = true;
     score++;
+    const prevCombo = combo;
     combo++;
     if (combo > maxCombo) maxCombo = combo;
     fingerStats[nextObs.zone].hits++;
     runner.jumping = true;
     runner.vy = -8;
     spawnParticles(nextObs.x, groundY - 40, nextObs.color, 8);
+    playSound('key');
+    if (combo > prevCombo && combo % 5 === 0) playSound('combo');
     updateHUD();
     updatePrompt(nextObs);
   } else {
@@ -338,6 +428,7 @@ function handleInput(key) {
     runner.stumbling = true;
     runner.stumbleTimer = 12;
     spawnParticles(runner.x + 20, groundY - 20, '#ff4444', 4);
+    playSound('hit');
     updateHUD();
   }
 }
@@ -367,20 +458,30 @@ document.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const key = normalizeKey(e);
 
+  if (key === 'Escape') {
+    if (state === 'playing') {
+      state = 'paused';
+      document.getElementById('pauseScreen').classList.remove('hidden');
+    } else if (state === 'paused') {
+      resumeGame();
+    }
+    return;
+  }
+
   if (key === ' ') {
     e.preventDefault();
     if (state === 'idle') {
-      // Start first unlocked level
       const progress = loadProgress();
       currentLessonIndex = Math.min(progress.unlocked - 1, LESSONS.length - 1);
       startGame();
     } else if (state === 'ended') {
       startGame();
+    } else if (state === 'paused') {
+      resumeGame();
     }
     return;
   }
 
-  // Number keys 1-6 for level select on idle screen
   if (state === 'idle') {
     const num = parseInt(key);
     if (num >= 1 && num <= LESSONS.length) {
@@ -404,10 +505,12 @@ document.addEventListener('keydown', (e) => {
 // ═══════════════════════════════════════════
 
 function updateHUD() {
-  document.getElementById('score').textContent = 'SCORE: ' + score;
-  const comboEl = document.getElementById('combo');
-  comboEl.textContent = 'x' + combo;
-  comboEl.classList.toggle('inactive', combo === 0);
+  DOM.score.textContent = `SCORE: ${score}`;
+  DOM.combo.textContent = `x${combo}`;
+  DOM.combo.classList.toggle('inactive', combo === 0);
+  if (DOM.speedIndicator) {
+    DOM.speedIndicator.textContent = `${speedMultiplier.toFixed(1)}x`;
+  }
 }
 
 function updatePrompt(obs) {
@@ -419,10 +522,10 @@ function updatePrompt(obs) {
 
 function showNextPrompt() {
   const nextObs = obstacles.find(o => !o.cleared && o.x > runner.x - 20);
-  if (nextObs) {
+  if (nextObs && nextObs.key) {
     updatePrompt(nextObs);
   } else {
-    document.getElementById('prompt').textContent = '';
+    DOM.prompt.textContent = '';
   }
 }
 
@@ -432,13 +535,19 @@ function showNextPrompt() {
 
 function drawBackground() {
   const lesson = currentLesson();
-  // Gradient sky with level-themed colors
-  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  grad.addColorStop(0, '#0a0a23');
-  grad.addColorStop(0.5, '#1a1a3e');
-  grad.addColorStop(0.78, lesson.bg1);
-  grad.addColorStop(1, lesson.bg2);
-  ctx.fillStyle = grad;
+  const lessonId = lesson.id;
+
+  // Cache gradient - only recreate when lesson changes
+  if (!cachedGradient || lastLessonId !== lessonId) {
+    cachedGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    cachedGradient.addColorStop(0, '#0a0a23');
+    cachedGradient.addColorStop(0.5, '#1a1a3e');
+    cachedGradient.addColorStop(0.78, lesson.bg1);
+    cachedGradient.addColorStop(1, lesson.bg2);
+    lastLessonId = lessonId;
+  }
+
+  ctx.fillStyle = cachedGradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Stars
@@ -458,7 +567,7 @@ function drawBackground() {
   ctx.globalAlpha = 1;
 
   // Ground texture lines
-  ctx.strokeStyle = lesson.ground + '26'; // 15% alpha hex
+  ctx.strokeStyle = lesson.ground + '26';
   ctx.lineWidth = 1;
   for (let i = 0; i < 20; i++) {
     const gx = ((i * 80 - scrollOffset * 0.8) % (canvas.width + 80) + canvas.width + 80) % (canvas.width + 80) - 40;
@@ -706,12 +815,18 @@ function update(dt) {
     return;
   }
 
+  // Progressive speed increase: up to 50% faster by end of level
+  const lesson = currentLesson();
+  const progress = 1 - (timeLeft / lesson.duration);
+  speedMultiplier = 1 + (progress * 0.5);
+  const effectiveSpeed = lesson.speed * speedMultiplier;
+
   // Scroll
-  scrollOffset += currentLesson().speed;
+  scrollOffset += effectiveSpeed;
 
   // Runner physics
   if (runner.jumping) {
-    runner.vy += 0.4; // gravity
+    runner.vy += 0.4;
     runner.y += runner.vy;
     if (runner.y >= groundY) {
       runner.y = groundY;
@@ -724,15 +839,15 @@ function update(dt) {
     if (runner.stumbleTimer <= 0) runner.stumbling = false;
   }
 
-  // Spawn obstacles
-  nextObstacleIn--;
+  // Spawn obstacles - spawn faster as speed increases
+  nextObstacleIn -= speedMultiplier;
   if (nextObstacleIn <= 0) {
     spawnObstacle();
   }
 
   // Move obstacles
   for (const obs of obstacles) {
-    obs.x -= currentLesson().speed;
+    obs.x -= effectiveSpeed;
   }
 
   // Remove off-screen obstacles (missed ones)
@@ -792,15 +907,21 @@ function gameLoop(timestamp) {
 // ═══════════════════════════════════════════
 
 function startGame() {
-  document.getElementById('startScreen').classList.add('hidden');
-  document.getElementById('endScreen').classList.add('hidden');
+  DOM.startScreen.classList.add('hidden');
+  DOM.endScreen.classList.add('hidden');
+  document.getElementById('pauseScreen').classList.add('hidden');
   resetState();
   initCanvas();
   buildKeyboard();
   state = 'playing';
   updateHUD();
-  document.getElementById('hudLesson').querySelector('span').textContent = currentLesson().name;
-  document.getElementById('prompt').textContent = '';
+  DOM.hudLesson.querySelector('span').textContent = currentLesson().name;
+  DOM.prompt.textContent = '';
+}
+
+function resumeGame() {
+  document.getElementById('pauseScreen').classList.add('hidden');
+  state = 'playing';
 }
 
 function endGame() {
@@ -914,6 +1035,7 @@ function buildLevelSelect() {
 // ═══════════════════════════════════════════
 
 window.addEventListener('load', () => {
+  initDOM();
   initCanvas();
   buildKeyboard();
   buildLevelSelect();
