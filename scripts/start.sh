@@ -2,6 +2,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+STOP_SCRIPT="$SCRIPT_DIR/stop.sh"
 PORT=8080
 
 echo "🎹 Starting Keyboard Practice..."
@@ -23,4 +24,4 @@ echo "📝 Press any key to stop..."
 echo ""
 
 read -n 1
-./stop.sh
+"$STOP_SCRIPT"
