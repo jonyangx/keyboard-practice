@@ -187,6 +187,8 @@ const KB_ROWS = [
 // GAME STATE
 // ═══════════════════════════════════════════
 
+let canvas, ctx;
+let state = 'idle';
 let score = 0;
 let combo = 0;
 let paused = false;
@@ -195,6 +197,8 @@ let gameStarted = false;
 let lastTime = 0;
 let scrollOffset = 0;
 let groundY = 0;
+let timeLeft = 0;
+let obstacles = [];
 
 // Performance: cache DOM references
 const DOM = {};
@@ -299,12 +303,15 @@ function resetState() {
 function initCanvas() {
   canvas = document.getElementById('game');
   const wrap = canvas.parentElement;
-  canvas.width = wrap.clientWidth;
-  canvas.height = wrap.clientHeight;
+  const w = wrap.clientWidth || 800;
+  const h = wrap.clientHeight || 400;
+  canvas.width = w;
+  canvas.height = h;
   ctx = canvas.getContext('2d');
   groundY = canvas.height * 0.78;
   runner.x = canvas.width * 0.15;
   runner.y = groundY;
+  scrollOffset = 0;
 }
 
 // ═══════════════════════════════════════════
