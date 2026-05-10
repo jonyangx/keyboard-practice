@@ -28,7 +28,7 @@
   @keyframes promptPulse { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.02); } }
 
   /* On-screen keyboard */
-  .keyboard { padding: 8px 12px 10px; background: #16213e; display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .keyboard { padding: 8px 12px 10px; background: #16213e; display: flex !important; flex-direction: column; gap: 4px; align-items: center; min-height: 120px; border-top: 1px solid #0f3460; visibility: visible; }
   .kb-row { display: flex; gap: 3px; }
   .key { width: 36px; height: 36px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-family: 'Courier New', monospace; font-size: 13px; font-weight: 700; border: 2px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); color: #666; transition: transform 0.1s, box-shadow 0.1s, border-color 0.1s; }
   .key.lp { background: rgba(255,107,107,0.15); color: #ff6b6b; border-color: rgba(255,107,107,0.3); }
@@ -270,7 +270,6 @@ function playSound(type) {
 }
 let runner = { x: 0, y: 0, vy: 0, jumping: false, stumbling: false, stumbleTimer: 0 };
 let fingerStats = {};
-let lastTime = 0;
 let activeKey = null;
 let activeKeyTimer = 0;
 let particles = [];
