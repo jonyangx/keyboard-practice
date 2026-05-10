@@ -1028,9 +1028,15 @@ function toggleMusic() {
 
 function exitToMenu() {
   state = 'idle';
+  stopBgMusic();
   document.getElementById('pauseScreen').classList.add('hidden');
+  DOM.endScreen.classList.add('hidden');
   DOM.startScreen.classList.remove('hidden');
   buildLevelSelect();
+  // Clear canvas
+  if (ctx && canvas) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 function endGame() {
