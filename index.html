@@ -13,6 +13,12 @@
   .hud-score { font-size: 16px; font-weight: 700; color: #00d2ff; }
   .hud-lesson { font-size: 13px; color: #a0a0c0; }
   .hud-lesson span { color: #53d769; font-weight: 600; }
+  .hud-actions { display: flex; gap: 8px; }
+  .hud-btn { padding: 6px 14px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: transform 0.1s, opacity 0.1s; }
+  .hud-btn:hover { transform: scale(1.05); }
+  .hud-btn:active { transform: scale(0.95); }
+  .hud-btn-pause { background: #ffd93d; color: #1a1a2e; }
+  .hud-btn-exit { background: #ff6b6b; color: #fff; }
 .hud-combo { font-size: 20px; font-weight: 900; color: #ff6b6b; text-shadow: 0 0 10px rgba(255,107,107,0.5); }
 .hud-combo.inactive { opacity: 0.3; }
 .hud-speed { font-size: 12px; color: #ffd93d; margin-left: 12px; }
@@ -70,7 +76,10 @@
 <div class="hud">
   <div class="hud-score" id="score">SCORE: 0</div>
   <div class="hud-lesson" id="hudLesson">WORLD: <span>基准键 Home Row</span></div>
-  <div>
+  <div class="hud-actions">
+    <button class="hud-btn" id="btnMusic" onclick="toggleMusic()" style="background:#4ecdc4;color:#fff;">🎵</button>
+    <button class="hud-btn hud-btn-pause" id="btnPause" onclick="togglePause()">暂停</button>
+    <button class="hud-btn hud-btn-exit" onclick="exitToMenu()">退出</button>
     <div class="hud-combo inactive" id="combo">x0</div>
     <div class="hud-speed" id="speedIndicator">1.0x</div>
   </div>
@@ -225,10 +234,68 @@ let lastLessonId = null;
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 let audioEnabled = true;
+let bgMusicEnabled = false;
+let bgMusicInterval = null;
 
 function initAudio() {
   if (!audioCtx) audioCtx = new AudioCtx();
   if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+// 清新背景音乐 - 简单的旋律循环
+const MELODY = [
+  { note: 523, dur: 0.3 }, // C5
+  { note: 587, dur: 0.3 }, // D5
+  { note: 659, dur: 0.3 }, // E5
+  { note: 523, dur: 0.3 }, // C5
+  { note: 659, dur: 0.3 }, // E5
+  { note: 587, dur: 0.3 }, // D5
+  { note: 523, dur: 0.6 }, // C5
+  { note: 0, dur: 0.2 },   // rest
+  { note: 784, dur: 0.3 }, // G5
+  { note: 880, dur: 0.3 }, // A5
+  { note: 784, dur: 0.3 }, // G5
+  { note: 659, dur: 0.3 }, // E5
+  { note: 784, dur: 0.3 }, // G5
+  { note: 880, dur: 0.6 }, // A5
+  { note: 0, dur: 0.2 },   // rest
+];
+let melodyIndex = 0;
+
+function playBgNote(freq, duration) {
+  if (!audioCtx || !bgMusicEnabled) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration * 0.9);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function startBgMusic() {
+  if (bgMusicInterval) return;
+  bgMusicEnabled = true;
+  melodyIndex = 0;
+  const playNext = () => {
+    if (!bgMusicEnabled) return;
+    const m = MELODY[melodyIndex];
+    if (m.note > 0) playBgNote(m.note, m.dur);
+    melodyIndex = (melodyIndex + 1) % MELODY.length;
+    setTimeout(playNext, m.dur * 1000 * 0.9);
+  };
+  playNext();
+}
+
+function stopBgMusic() {
+  bgMusicEnabled = false;
+  if (bgMusicInterval) {
+    clearTimeout(bgMusicInterval);
+    bgMusicInterval = null;
+  }
 }
 
 function playSound(type) {
@@ -469,11 +536,8 @@ document.addEventListener('keydown', (e) => {
   const key = normalizeKey(e);
 
   if (key === 'Escape') {
-    if (state === 'playing') {
-      state = 'paused';
-      document.getElementById('pauseScreen').classList.remove('hidden');
-    } else if (state === 'paused') {
-      resumeGame();
+    if (state === 'playing' || state === 'paused') {
+      togglePause();
     }
     return;
   }
@@ -930,6 +994,7 @@ function startGame() {
   updateHUD();
   DOM.hudLesson.querySelector('span').textContent = currentLesson().name;
   DOM.prompt.textContent = '';
+  if (musicOn) startBgMusic();
 }
 
 function resumeGame() {
@@ -937,10 +1002,42 @@ function resumeGame() {
   state = 'playing';
 }
 
+function togglePause() {
+  if (state === 'playing') {
+    state = 'paused';
+    document.getElementById('pauseScreen').classList.remove('hidden');
+    stopBgMusic();
+  } else if (state === 'paused') {
+    resumeGame();
+    if (bgMusicEnabled) startBgMusic();
+  }
+}
+
+let musicOn = false;
+function toggleMusic() {
+  musicOn = !musicOn;
+  const btn = document.getElementById('btnMusic');
+  btn.textContent = musicOn ? '🎶' : '🎵';
+  btn.style.background = musicOn ? '#53d769' : '#4ecdc4';
+  if (musicOn && state === 'playing') {
+    startBgMusic();
+  } else {
+    stopBgMusic();
+  }
+}
+
+function exitToMenu() {
+  state = 'idle';
+  document.getElementById('pauseScreen').classList.add('hidden');
+  DOM.startScreen.classList.remove('hidden');
+  buildLevelSelect();
+}
+
 function endGame() {
   state = 'ended';
   clearHighlight();
   document.getElementById('prompt').textContent = '';
+  stopBgMusic();
   showEndScreen();
 }
 
