@@ -91,8 +91,12 @@
   .key.rp { background: linear-gradient(180deg, rgba(232,67,147,0.25) 0%, rgba(232,67,147,0.15) 100%); color: #e84393; border-color: rgba(232,67,147,0.4); box-shadow: 0 4px 0 rgba(232,67,147,0.3), 0 6px 10px rgba(0,0,0,0.3); }
   .key.space { width: 180px; }
   .key.active { transform: scale(1.25) translateY(-2px); box-shadow: 0 0 24px currentColor, 0 0 40px currentColor, 0 8px 20px currentColor, inset 0 0 12px rgba(255,255,255,0.3); border-color: currentColor; background: linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 100%); animation: keyFlash 0.15s ease-out; }
+  .key.error { animation: keyError 0.3s ease-out; }
   @keyframes keyFlash { 0% { transform: scale(1.35) translateY(-4px); } 100% { transform: scale(1.25) translateY(-2px); } }
+  @keyframes keyError { 0%,100% { filter: brightness(1); } 25%,75% { filter: brightness(0.5) hue-rotate(180deg); } }
   .key.dimmed { opacity: 0.25; }
+  .key.glow-trail { animation: glowTrail 0.3s ease-out; }
+  @keyframes glowTrail { 0% { box-shadow: 0 0 30px currentColor, 0 0 60px currentColor; } 100% { box-shadow: 0 0 10px currentColor; } }
 
   /* Overlay screens - 增强过渡动画 */
   .overlay { position: absolute; inset: 0; background: rgba(10,10,30,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; opacity: 1; transition: opacity 0.3s ease, transform 0.3s ease; transform: scale(1); }
@@ -135,6 +139,9 @@
   .achievement-item em { color: #ffd700; font-size: 10px; margin-top: 6px; }
   .achievement-item.locked em { color: #666; }
   .achievements-modal button { display: block; margin: 20px auto 0; padding: 10px 30px; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #1a1a2e; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  .challenge-stat { display: flex; justify-content: space-between; padding: 10px 16px; background: rgba(255,215,0,0.08); border-radius: 8px; border: 1px solid rgba(255,215,0,0.2); font-size: 14px; }
+  .challenge-stat span:first-child { color: #a0a0c0; }
+  .challenge-stat span:last-child { color: #ffd700; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -186,6 +193,9 @@
       <button class="btn btn-primary" onclick="selectMode('word')" style="background:linear-gradient(135deg,#ff6b6b,#e84393);">
         📖 单词模式 Word Mode<br><span style="font-size:12px;font-weight:400;opacity:0.8;">边打字 · 边记单词</span>
       </button>
+      <button class="btn btn-primary" onclick="selectMode('challenge')" style="background:linear-gradient(135deg,#ffd700,#ff8c00);">
+        🎯 每日挑战 Daily Challenge<br><span style="font-size:12px;font-weight:400;opacity:0.8;">随机关卡 · 限时挑战</span>
+      </button>
     </div>
   </div>
 
@@ -197,6 +207,33 @@
       选择单词组别<br>Choose Word Category
     </p>
     <div id="wordCategorySelect" style="display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; width:340px;"></div>
+    <div class="start-hint">按 <kbd>Esc</kbd> 返回</div>
+  </div>
+
+  <!-- Challenge Screen -->
+  <div class="overlay hidden" id="challengeScreen">
+    <h1>🎯 每日挑战</h1>
+    <h2>Daily Challenge</h2>
+    <p style="color:#ffd700; margin-bottom:16px; font-size:15px; text-align:center;">
+      今日挑战：<span id="challengeLessonName">-</span>
+    </p>
+    <div id="challengeStats" style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px; width:340px;">
+      <div class="challenge-stat">
+        <span>🏆 完成次数</span>
+        <span id="challengeCompletions">0</span>
+      </div>
+      <div class="challenge-stat">
+        <span>⭐ 最佳成绩</span>
+        <span id="challengeBestScore">-</span>
+      </div>
+      <div class="challenge-stat">
+        <span>🔥 最佳连击</span>
+        <span id="challengeBestCombo">-</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="startChallenge()" style="background:linear-gradient(135deg,#ffd700,#ff8c00); width:200px;">
+      开始挑战 Start
+    </button>
     <div class="start-hint">按 <kbd>Esc</kbd> 返回</div>
   </div>
 
@@ -622,7 +659,6 @@ function buildKeyboard() {
 }
 
 function highlightKey(key) {
-  // Remove previous highlight
   if (activeKey) {
     const prev = document.getElementById('key-' + activeKey);
     if (prev) prev.classList.remove('active');
@@ -630,13 +666,29 @@ function highlightKey(key) {
   activeKey = key;
   activeKeyTimer = 15;
   const el = document.getElementById('key-' + key);
-  if (el) el.classList.add('active');
+  if (el) {
+    el.classList.add('active');
+    el.classList.remove('glow-trail');
+    void el.offsetWidth;
+    el.classList.add('glow-trail');
+  }
+}
+
+function showKeyError(key) {
+  const el = document.getElementById('key-' + key);
+  if (el) {
+    el.classList.add('error');
+    setTimeout(() => el.classList.remove('error'), 300);
+  }
 }
 
 function clearHighlight() {
   if (activeKey) {
     const el = document.getElementById('key-' + activeKey);
-    if (el) el.classList.remove('active');
+    if (el) {
+      el.classList.remove('active');
+      el.classList.remove('glow-trail');
+    }
     activeKey = null;
   }
 }
@@ -818,14 +870,13 @@ function handleInput(key) {
     updateHUD();
     updatePrompt(nextObs);
   } else {
-    // Wrong key → stumble
     combo = 0;
     fingerStats[nextObs.zone].misses++;
     runner.stumbling = true;
     runner.stumbleTimer = 12;
     spawnParticles(runner.x + 20, groundY - 20, '#ff4444', 4);
     showHitRipple(runner.x + 20, groundY - 20, '#ff4444');
-    // Screen shake
+    showKeyError(nextObs.key);
     document.body.classList.add('shake');
     setTimeout(() => document.body.classList.remove('shake'), 300);
     playSound('hit');
@@ -922,10 +973,68 @@ function selectMode(mode) {
   if (mode === 'key') {
     document.getElementById('startScreen').classList.remove('hidden');
     buildLevelSelect();
-  } else {
+  } else if (mode === 'word') {
     document.getElementById('wordCategoryScreen').classList.remove('hidden');
     buildWordCategorySelect();
+  } else if (mode === 'challenge') {
+    document.getElementById('challengeScreen').classList.remove('hidden');
+    initChallenge();
   }
+}
+
+function initChallenge() {
+  const today = new Date().toDateString();
+  const challengeProgress = loadChallengeProgress();
+  document.getElementById('challengeCompletions').textContent = challengeProgress.completions;
+  document.getElementById('challengeBestScore').textContent = challengeProgress.bestScore > 0 ? challengeProgress.bestScore : '-';
+  document.getElementById('challengeBestCombo').textContent = challengeProgress.bestCombo > 0 ? 'x' + challengeProgress.bestCombo : '-';
+  const lessonIndex = getDailyChallengeLesson();
+  const lesson = LESSONS[lessonIndex];
+  document.getElementById('challengeLessonName').textContent = lesson.name;
+}
+
+function getDailyChallengeLesson() {
+  const today = new Date().toDateString();
+  let hash = 0;
+  for (let i = 0; i < today.length; i++) {
+    hash = ((hash << 5) - hash) + today.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return Math.abs(hash) % LESSONS.length;
+}
+
+function loadChallengeProgress() {
+  try {
+    const today = new Date().toDateString();
+    const data = JSON.parse(localStorage.getItem('kb-challenge-progress') || '{}');
+    if (data.date !== today) {
+      return { completions: 0, bestScore: 0, bestCombo: 0, date: today };
+    }
+    return data;
+  } catch {
+    return { completions: 0, bestScore: 0, bestCombo: 0, date: new Date().toDateString() };
+  }
+}
+
+function saveChallengeProgress(progress) {
+  try {
+    localStorage.setItem('kb-challenge-progress', JSON.stringify(progress));
+  } catch {}
+}
+
+function startChallenge() {
+  const lessonIndex = getDailyChallengeLesson();
+  setLesson(lessonIndex);
+  currentLessonIndex = lessonIndex;
+  gameMode = 'challenge';
+  document.getElementById('challengeScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+  document.querySelector('#startScreen h1').textContent = '🎯 每日挑战';
+  document.querySelector('#startScreen h2').textContent = LESSONS[lessonIndex].name;
+  document.querySelector('#startScreen p').innerHTML = `限时挑战<br>Time: ${LESSONS[lessonIndex].duration}秒`;
+  buildLevelSelect();
+  showMenu();
+  startGame();
 }
 
 function buildWordCategorySelect() {
@@ -1077,6 +1186,7 @@ function handleWordInput(key) {
     runner.stumbleTimer = 12;
     spawnParticles(runner.x + 20, groundY - 20, '#ff4444', 4);
     document.body.classList.add('shake');
+    showKeyError(expected);
     setTimeout(() => document.body.classList.remove('shake'), 300);
     playSound('hit');
     updateHUD();
@@ -1660,6 +1770,46 @@ function showEndScreen() {
     medalEl.style.display = 'block';
     document.getElementById('fingerBars').innerHTML = '';
     document.getElementById('btnNext').style.display = 'none';
+  } else if (gameMode === 'challenge') {
+    for (const stats of Object.values(fingerStats)) {
+      totalHits += stats.hits;
+      totalAttempts += stats.hits + stats.misses;
+    }
+    accuracy = totalAttempts > 0 ? Math.round((totalHits / totalAttempts) * 100) : 0;
+    const challengeProgress = loadChallengeProgress();
+    challengeProgress.completions++;
+    if (score > challengeProgress.bestScore) {
+      challengeProgress.bestScore = score;
+    }
+    if (maxCombo > challengeProgress.bestCombo) {
+      challengeProgress.bestCombo = maxCombo;
+    }
+    saveChallengeProgress(challengeProgress);
+    const title = document.getElementById('endTitle');
+    if (accuracy >= 60) {
+      title.textContent = '🎯 挑战完成 Challenge Complete!';
+      title.style.color = '#ffd700';
+    } else {
+      title.textContent = '继续加油 Keep Going!';
+      title.style.color = '#ffa06b';
+    }
+    document.getElementById('endStats').innerHTML = `
+      <div class="stat"><div class="stat-value" style="color:#ffd700">${score}</div><div class="stat-label">得分 Score</div></div>
+      <div class="stat"><div class="stat-value" style="color:#53d769">${accuracy}%</div><div class="stat-label">准确率 Accuracy</div></div>
+      <div class="stat"><div class="stat-value" style="color:#ff6b6b">x${maxCombo}</div><div class="stat-label">最大连击 Max Combo</div></div>
+    `;
+    const medalEl = document.getElementById('medal');
+    let medal = '', medalColor = '#888';
+    if (accuracy >= 95) { medal = '🥇'; medalColor = '#ffd700'; }
+    else if (accuracy >= 85) { medal = '🥈'; medalColor = '#c0c0c0'; }
+    else if (accuracy >= 70) { medal = '🥉'; medalColor = '#cd7f32'; }
+    else if (accuracy >= 60) { medal = '🎯'; medalColor = '#ffd700'; }
+    else { medal = '💪'; medalColor = '#ff6b6b'; }
+    medalEl.textContent = medal;
+    medalEl.style.color = medalColor;
+    medalEl.style.display = 'block';
+    document.getElementById('fingerBars').innerHTML = '';
+    document.getElementById('btnNext').style.display = 'none';
   } else {
     for (const stats of Object.values(fingerStats)) {
       totalHits += stats.hits;
@@ -1694,7 +1844,7 @@ function showEndScreen() {
     medalEl.style.color = medalColor;
     medalEl.style.display = accuracy >= 60 ? 'block' : 'none';
     const barsDiv = document.getElementById('fingerBars');
-barsDiv.innerHTML = '';
+    barsDiv.innerHTML = '';
     const lessonZones = [...new Set(currentLesson().keys.map(k => KEY_MAP[k]?.zone).filter(Boolean))];
 
     for (const zone of lessonZones) {
