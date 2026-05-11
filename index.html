@@ -22,7 +22,11 @@
 .hud-combo { font-size: 22px; font-weight: 900; color: #ff6b6b; text-shadow: 0 0 15px rgba(255,107,107,0.7); background: linear-gradient(135deg, rgba(255,107,107,0.15), rgba(255,107,107,0.05)); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,107,107,0.3); transition: transform 0.15s, text-shadow 0.15s; }
 .hud-combo.inactive { opacity: 0.3; }
 .hud-combo.pop { transform: scale(1.3); text-shadow: 0 0 25px rgba(255,107,107,1); }
+.hud-combo.fire { animation: comboFire 0.4s ease-out; color: #ff6b6b; }
+@keyframes comboFire { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.5) drop-shadow(0 0 15px #ff6b6b); } }
 .hud-speed { font-size: 13px; font-weight: 700; color: #ffd93d; margin-left: 12px; background: rgba(255,217,61,0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(255,217,61,0.2); }
+.combo-multiplier { position: absolute; top: 60px; right: 20px; font-size: 16px; font-weight: 700; padding: 4px 10px; border-radius: 6px; background: linear-gradient(135deg, rgba(255,107,107,0.2), rgba(255,107,107,0.1)); border: 1px solid rgba(255,107,107,0.4); color: #ff6b6b; text-shadow: 0 0 10px rgba(255,107,107,0.5); animation: multiplierPulse 1s ease-out; pointer-events: none; z-index: 10; }
+@keyframes multiplierPulse { 0% { transform: scale(0.5); opacity: 0; } 20% { transform: scale(1.2); opacity: 1; } 80% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.8); opacity: 0; } }
 
   /* Canvas */
   .canvas-wrap { flex: 1; position: relative; min-height: 200px; background: radial-gradient(ellipse at center, rgba(0,210,255,0.03) 0%, transparent 70%); }
@@ -124,6 +128,7 @@
     <button class="hud-btn hud-btn-pause" id="btnPause" onclick="togglePause()">暂停</button>
     <button class="hud-btn hud-btn-exit" onclick="exitToMenu()">退出</button>
     <div class="hud-combo inactive" id="combo">x0</div>
+    <div class="combo-multiplier" id="comboMultiplier" style="display:none;"></div>
     <div class="hud-speed" id="speedIndicator">1.0x</div>
     <span class="hud-shortcuts"><kbd>Esc</kbd>暂停 <kbd>Tab</kbd>音乐</span>
   </div>
@@ -321,6 +326,7 @@ const DOM = {};
 function initDOM() {
   DOM.score = document.getElementById('score');
   DOM.combo = document.getElementById('combo');
+  DOM.comboMultiplier = document.getElementById('comboMultiplier');
   DOM.hudLesson = document.getElementById('hudLesson');
   DOM.prompt = document.getElementById('prompt');
   DOM.startScreen = document.getElementById('startScreen');
@@ -615,19 +621,21 @@ function showHitRipple(x, y, color) {
   }
 }
 
-// Combo text effect
+// Combo text effect & multiplier display
 const COMBO_WORDS = {
-  5: { text: 'NICE!', color: '#53d769' },
-  10: { text: 'GREAT!', color: '#4ecdc4' },
-  15: { text: 'AMAZING!', color: '#00d2ff' },
-  20: { text: 'PERFECT!', color: '#ffd93d' },
-  25: { text: 'LEGENDARY!', color: '#ff6b6b' },
-  30: { text: 'GODLIKE!', color: '#e84393' },
+  5: { text: 'NICE!', color: '#53d769', mult: 1.0 },
+  10: { text: 'GREAT!', color: '#4ecdc4', mult: 1.2 },
+  15: { text: 'AMAZING!', color: '#00d2ff', mult: 1.5 },
+  20: { text: 'PERFECT!', color: '#ffd93d', mult: 2.0 },
+  25: { text: 'LEGENDARY!', color: '#ff6b6b', mult: 2.5 },
+  30: { text: 'GODLIKE!', color: '#e84393', mult: 3.0 },
+  50: { text: 'UNSTOPPABLE!', color: '#ffd700', mult: 4.0 },
 };
 function showComboText(combo) {
   const comboText = document.getElementById('comboText');
   if (!comboText) return;
-  const threshold = Math.floor(combo / 5) * 5;
+  const thresholds = [5, 10, 15, 20, 25, 30, 50].filter(t => t <= combo).sort((a,b) => b - a);
+  const threshold = thresholds[0];
   const effect = COMBO_WORDS[threshold];
   if (!effect) return;
   comboText.textContent = effect.text;
@@ -636,6 +644,14 @@ function showComboText(combo) {
   comboText.classList.remove('show');
   void comboText.offsetWidth;
   comboText.classList.add('show');
+  if (DOM.comboMultiplier && effect.mult > 1) {
+    DOM.comboMultiplier.textContent = `${effect.mult}x`;
+    DOM.comboMultiplier.style.display = 'block';
+    DOM.comboMultiplier.style.animation = 'none';
+    void DOM.comboMultiplier.offsetWidth;
+    DOM.comboMultiplier.style.animation = 'multiplierPulse 1s ease-out forwards';
+    setTimeout(() => { DOM.comboMultiplier.style.display = 'none'; }, 1000);
+  }
 }
 
 // Ambient background particles
@@ -690,6 +706,8 @@ function handleInput(key) {
     const prevCombo = combo;
     combo++;
     if (combo > maxCombo) maxCombo = combo;
+    const mult = getComboMultiplier(combo);
+    score += Math.round(mult);
     fingerStats[nextObs.zone].hits++;
     runner.jumping = true;
     runner.vy = -8;
@@ -938,16 +956,18 @@ function handleWordInput(key) {
     const prevCombo = combo;
     combo++;
     if (combo > maxCombo) maxCombo = combo;
-    score += 10 * (1 + Math.floor(combo / 10) * 0.5);
+    const mult = getComboMultiplier(combo);
+    score += Math.round(10 * mult);
     spawnParticles(runner.x + 30, groundY - 30, obstacles[0]?.color || '#00d2ff', 6);
     playSound('key');
-    if (combo % 10 === 0) showComboText(combo);
+    if (combo % 5 === 0) showComboText(combo);
     updateHUD();
     if (typedText === currentWord) {
       obs.cleared = true;
       combo++;
       if (combo > maxCombo) maxCombo = combo;
-      score += 50;
+      const mult = getComboMultiplier(combo);
+      score += Math.round(50 * mult);
       spawnParticles(obs.x + 50, groundY - 50, cat.color, 15);
       showComboText(combo);
       playSound('combo');
@@ -965,6 +985,17 @@ function handleWordInput(key) {
     playSound('hit');
     updateHUD();
   }
+}
+
+function getComboMultiplier(combo) {
+  if (combo >= 50) return 4.0;
+  if (combo >= 30) return 3.0;
+  if (combo >= 25) return 2.5;
+  if (combo >= 20) return 2.0;
+  if (combo >= 15) return 1.5;
+  if (combo >= 10) return 1.2;
+  if (combo >= 5) return 1.0;
+  return 1.0;
 }
 
 function updateWordPrompt() {
