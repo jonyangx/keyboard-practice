@@ -114,6 +114,27 @@
   .btn-primary:hover { box-shadow: 0 6px 30px rgba(0,210,255,0.6); }
   .start-hint { font-size: 13px; color: #a0a0c0; margin-top: 16px; }
   .start-hint kbd { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+
+  .achievement-toast { position: fixed; bottom: 20px; right: 20px; background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,107,107,0.1)); border: 1px solid rgba(255,215,0,0.4); border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 12px; z-index: 1000; opacity: 0; transform: translateX(100px); transition: all 0.3s ease; pointer-events: none; }
+  .achievement-toast.show { opacity: 1; transform: translateX(0); }
+  .achievement-toast .achievement-icon { font-size: 32px; }
+  .achievement-toast .achievement-text { display: flex; flex-direction: column; }
+  .achievement-toast .achievement-text strong { color: #ffd700; font-size: 15px; }
+  .achievement-toast .achievement-text small { color: #a0a0c0; font-size: 12px; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 500; }
+  .achievements-modal { background: linear-gradient(180deg, #1a1a2e, #0f0f1a); border: 1px solid rgba(255,215,0,0.3); border-radius: 16px; padding: 24px; max-width: 500px; width: 90%; }
+  .achievements-modal h2 { color: #ffd700; text-align: center; margin-bottom: 20px; font-size: 22px; }
+  .achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+  .achievement-item { display: flex; flex-direction: column; align-items: center; padding: 16px 8px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); transition: all 0.2s; }
+  .achievement-item.unlocked { background: linear-gradient(135deg, rgba(255,215,0,0.08), rgba(255,107,107,0.05)); border-color: rgba(255,215,0,0.3); }
+  .achievement-item.locked { opacity: 0.5; filter: grayscale(1); }
+  .achievement-item .achievement-icon { font-size: 28px; margin-bottom: 6px; }
+  .achievement-item strong { color: #e0e0e0; font-size: 13px; text-align: center; }
+  .achievement-item small { color: #a0a0c0; font-size: 11px; text-align: center; margin-top: 4px; }
+  .achievement-item em { color: #ffd700; font-size: 10px; margin-top: 6px; }
+  .achievement-item.locked em { color: #666; }
+  .achievements-modal button { display: block; margin: 20px auto 0; padding: 10px 30px; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #1a1a2e; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -277,12 +298,87 @@ let currentWordIndex = 0;
 let typedText = '';
 function currentLesson() { return LESSONS[currentLessonIndex]; }
 
+// Achievement definitions
+const ACHIEVEMENTS = {
+  firstWin: { id: 'firstWin', name: '初露锋芒', nameEn: 'First Win', desc: '完成第一个关卡', icon: '🎯', condition: (stats) => stats.completedLessons >= 1 },
+  combo10: { id: 'combo10', name: '连击达人', nameEn: 'Combo Master', desc: '达成10连击', icon: '🔥', condition: (stats) => stats.maxCombo >= 10 },
+  combo20: { id: 'combo20', name: '连击王者', nameEn: 'Combo King', desc: '达成20连击', icon: '👑', condition: (stats) => stats.maxCombo >= 20 },
+  combo50: { id: 'combo50', name: '连击传说', nameEn: 'Combo Legend', desc: '达成50连击', icon: '💎', condition: (stats) => stats.maxCombo >= 50 },
+  perfect: { id: 'perfect', name: '完美通关', nameEn: 'Perfect', desc: '准确率100%通关', icon: '⭐', condition: (stats) => stats.perfectCount >= 1 },
+  speedDemon: { id: 'speedDemon', name: '速度恶魔', nameEn: 'Speed Demon', desc: 'WPM超过40', icon: '⚡', condition: (stats) => stats.maxWPM >= 40 },
+  wordMaster: { id: 'wordMaster', name: '词汇大师', nameEn: 'Word Master', desc: '单词模式通关100词', icon: '📚', condition: (stats) => stats.wordsTyped >= 100 },
+  marathon: { id: 'marathon', name: '马拉松', nameEn: 'Marathon', desc: '累计完成500个按键', icon: '🏃', condition: (stats) => stats.totalKeys >= 500 },
+  allLessons: { id: 'allLessons', name: '全关卡通关', nameEn: 'All Lessons', desc: '通关所有练习关卡', icon: '🏆', condition: (stats) => stats.completedLessons >= 6 },
+};
+
+function getStats() {
+  const progress = loadProgress();
+  return {
+    completedLessons: Object.keys(progress.bestAccuracy || {}).filter(k => progress.bestAccuracy[k] > 0).length,
+    maxCombo: progress.maxCombo || 0,
+    perfectCount: progress.perfectCount || 0,
+    maxWPM: progress.maxWPM || 0,
+    wordsTyped: progress.wordsTyped || 0,
+    totalKeys: progress.totalKeys || 0,
+  };
+}
+
+function checkAndUnlockAchievements(stats) {
+  const progress = loadProgress();
+  const unlocked = progress.achievements || [];
+  const newUnlocks = [];
+  for (const [id, ach] of Object.entries(ACHIEVEMENTS)) {
+    if (!unlocked.includes(id) && ach.condition(stats)) {
+      unlocked.push(id);
+      newUnlocks.push(ach);
+    }
+  }
+  if (newUnlocks.length > 0) {
+    progress.achievements = unlocked;
+    saveProgress(progress);
+    newUnlocks.forEach(ach => showAchievementUnlock(ach));
+  }
+  return newUnlocks;
+}
+
+function showAchievementUnlock(ach) {
+  const toast = document.createElement('div');
+  toast.className = 'achievement-toast';
+  toast.innerHTML = `<span class="achievement-icon">${ach.icon}</span><span class="achievement-text"><strong>${ach.name}</strong><small>${ach.desc}</small></span>`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.add('show'), 50);
+  setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 400); }, 3000);
+  playSound('achievement');
+}
+
+function showAchievements() {
+  const stats = getStats();
+  const progress = loadProgress();
+  const unlocked = progress.achievements || [];
+  let html = '<div class="achievements-modal"><h2>🏅 成就 Achievements</h2><div class="achievements-grid">';
+  for (const [id, ach] of Object.entries(ACHIEVEMENTS)) {
+    const isUnlocked = unlocked.includes(id);
+    html += `<div class="achievement-item ${isUnlocked ? 'unlocked' : 'locked'}">
+      <span class="achievement-icon">${ach.icon}</span>
+      <strong>${ach.name}</strong>
+      <small>${ach.desc}</small>
+      <em>${isUnlocked ? '已解锁' : '未解锁'}</em>
+    </div>`;
+  }
+  html += '</div><button onclick="this.closest(\'.achievements-modal\').remove()">关闭</button></div>';
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = html;
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  document.body.appendChild(modal);
+}
+
 // Progress persistence
 function loadProgress() {
   try {
     const data = JSON.parse(localStorage.getItem('kb-runner-progress') || '{}');
-    return { unlocked: data.unlocked || 1, bestAccuracy: data.bestAccuracy || {} };
-  } catch { return { unlocked: 1, bestAccuracy: {} }; }
+    return { unlocked: data.unlocked || 1, bestAccuracy: data.bestAccuracy || {}, achievements: data.achievements || [], maxCombo: data.maxCombo || 0, perfectCount: data.perfectCount || 0, maxWPM: data.maxWPM || 0, wordsTyped: data.wordsTyped || 0, totalKeys: data.totalKeys || 0 };
+  } catch { return { unlocked: 1, bestAccuracy: {}, achievements: [], maxCombo: 0, perfectCount: 0, maxWPM: 0, wordsTyped: 0, totalKeys: 0 }; }
 }
 function saveProgress(progress) {
   try { localStorage.setItem('kb-runner-progress', JSON.stringify(progress)); } catch {}

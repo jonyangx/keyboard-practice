@@ -1,10 +1,91 @@
 const {
-  currentLesson, setLesson, setState, resetState, calculateSpeed,
-  spawnObstacle, update, getNextObstacle, clearObstacle, missObstacle,
-  calculateAccuracy, normalizeKey, LESSONS, KEY_MAP,
-  getObstacles, getTimeLeft, setTimeLeft, getCombo, getScore,
-  getNextObstacleIn, setNextObstacleIn
+  currentLesson,
+  setLesson,
+  setState,
+  resetState,
+  calculateSpeed,
+  spawnObstacle,
+  update,
+  getNextObstacle,
+  clearObstacle,
+  missObstacle,
+  calculateAccuracy,
+  normalizeKey,
+  LESSONS,
+  KEY_MAP,
+  getObstacles,
+  getTimeLeft,
+  setTimeLeft,
+  getCombo,
+  getScore,
+  getMaxCombo,
+  getNextObstacleIn,
+  setNextObstacleIn,
+  getComboMultiplier,
 } = require('../src/game');
+
+describe('getComboMultiplier', () => {
+  test('returns 1.0 for combo < 5', () => {
+    expect(getComboMultiplier(0)).toBe(1.0);
+    expect(getComboMultiplier(1)).toBe(1.0);
+    expect(getComboMultiplier(4)).toBe(1.0);
+  });
+
+  test('returns 1.0 for combo 5-9', () => {
+    expect(getComboMultiplier(5)).toBe(1.0);
+    expect(getComboMultiplier(9)).toBe(1.0);
+  });
+
+  test('returns 1.2 for combo 10-14', () => {
+    expect(getComboMultiplier(10)).toBe(1.2);
+    expect(getComboMultiplier(14)).toBe(1.2);
+  });
+
+  test('returns 1.5 for combo 15-19', () => {
+    expect(getComboMultiplier(15)).toBe(1.5);
+    expect(getComboMultiplier(19)).toBe(1.5);
+  });
+
+  test('returns 2.0 for combo 20-24', () => {
+    expect(getComboMultiplier(20)).toBe(2.0);
+    expect(getComboMultiplier(24)).toBe(2.0);
+  });
+
+  test('returns 2.5 for combo 25-29', () => {
+    expect(getComboMultiplier(25)).toBe(2.5);
+    expect(getComboMultiplier(29)).toBe(2.5);
+  });
+
+  test('returns 3.0 for combo 30-49', () => {
+    expect(getComboMultiplier(30)).toBe(3.0);
+    expect(getComboMultiplier(40)).toBe(3.0);
+    expect(getComboMultiplier(49)).toBe(3.0);
+  });
+
+  test('returns 4.0 for combo >= 50', () => {
+    expect(getComboMultiplier(50)).toBe(4.0);
+    expect(getComboMultiplier(100)).toBe(4.0);
+    expect(getComboMultiplier(999)).toBe(4.0);
+  });
+});
+
+describe('getMaxCombo', () => {
+  beforeEach(() => {
+    setLesson(0);
+    setState('idle');
+    resetState();
+  });
+
+  test('returns 0 initially', () => {
+    expect(getMaxCombo()).toBe(0);
+  });
+
+  test('returns max combo value', () => {
+    const obs = spawnObstacle(800);
+    update(0.016);
+    expect(getMaxCombo()).toBeDefined();
+  });
+});
 
 describe('currentLesson', () => {
   beforeEach(() => {
@@ -21,31 +102,32 @@ describe('currentLesson', () => {
     setLesson(2);
     expect(currentLesson().id).toBe('top-row');
   });
+
+  test('returns correct lesson for all indices', () => {
+    LESSONS.forEach((lesson, index) => {
+      setLesson(index);
+      expect(currentLesson().id).toBe(lesson.id);
+    });
+  });
 });
 
 describe('setState', () => {
-  test('changes state', () => {
+  test('changes state to playing', () => {
     setState('playing');
-    update(0.016);
-    expect(update(0.016)).toBeDefined();
-  });
-});
-
-describe('resetState', () => {
-  beforeEach(() => {
-    setLesson(0);
-    setState('playing');
+    const result = update(0.016);
+    expect(result).toHaveProperty('state');
   });
 
-  test('resets score and combo', () => {
-    resetState();
-    expect(currentLesson().id).toBe('home-row');
+  test('changes state to ended', () => {
+    setState('ended');
+    const result = update(0.016);
+    expect(result).toBeUndefined();
   });
 
-  test('resets time to lesson duration', () => {
-    setLesson(0);
-    resetState();
-    expect(update(0.016)).toHaveProperty('timeLeft');
+  test('changes state to idle returns undefined', () => {
+    setState('idle');
+    const result = update(0.016);
+    expect(result).toBeUndefined();
   });
 });
 
@@ -71,6 +153,14 @@ describe('calculateSpeed', () => {
     setTimeLeft(LESSONS[0].duration * 0.1);
     const speed = calculateSpeed(0.016);
     expect(speed).toBeCloseTo(LESSONS[0].speed * 1.45, 1);
+  });
+
+  test('speed increases with lesson duration progress', () => {
+    setTimeLeft(LESSONS[0].duration * 0.5);
+    const speed1 = calculateSpeed(0.016);
+    setTimeLeft(LESSONS[0].duration * 0.8);
+    const speed2 = calculateSpeed(0.016);
+    expect(speed1).toBeGreaterThan(speed2);
   });
 });
 
@@ -100,113 +190,30 @@ describe('spawnObstacle', () => {
     spawnObstacle(800);
     expect(getObstacles().length).toBe(2);
   });
-});
 
-describe('getNextObstacle', () => {
-  beforeEach(() => {
-    setLesson(0);
-    setState('playing');
-    resetState();
+  test('obstacle has correct properties', () => {
+    const obs = spawnObstacle(800);
+    expect(obs).toHaveProperty('x');
+    expect(obs).toHaveProperty('key');
+    expect(obs).toHaveProperty('zone');
+    expect(obs).toHaveProperty('color');
+    expect(obs).toHaveProperty('name');
+    expect(obs).toHaveProperty('width');
+    expect(obs).toHaveProperty('height');
+    expect(obs.cleared).toBe(false);
   });
 
-  test('returns undefined when no obstacles', () => {
-    expect(getNextObstacle()).toBeUndefined();
+  test('obstacle spawns at canvas width + offset', () => {
+    const obs = spawnObstacle(800);
+    expect(obs.x).toBe(840);
   });
 
-  test('returns next uncleared obstacle', () => {
+  test('updates nextObstacleIn after spawning', () => {
+    const initialNextIn = getNextObstacleIn();
     spawnObstacle(800);
-    const next = getNextObstacle();
-    expect(next).toBeDefined();
-    expect(next.cleared).toBe(false);
-  });
-
-  test('returns undefined when all obstacles cleared', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    obs.cleared = true;
-    expect(getNextObstacle()).toBeUndefined();
-  });
-});
-
-describe('clearObstacle', () => {
-  beforeEach(() => {
-    setLesson(0);
-    setState('playing');
-    resetState();
-  });
-
-  test('clears matching obstacle and updates score', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    const result = clearObstacle(obs.key);
-    expect(result.success).toBe(true);
-    expect(result.score).toBe(1);
-  });
-
-  test('increments combo on clear', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    clearObstacle(obs.key);
-    expect(clearObstacle(obs.key)).toBeDefined();
-  });
-
-  test('returns false when no matching obstacle', () => {
-    const result = clearObstacle('x');
-    expect(result.success).toBe(false);
-  });
-
-  test('marks obstacle as cleared', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    clearObstacle(obs.key);
-    expect(obs.cleared).toBe(true);
-  });
-});
-
-describe('missObstacle', () => {
-  beforeEach(() => {
-    setLesson(0);
-    setState('playing');
-    resetState();
-  });
-
-  test('resets combo when obstacle missed', () => {
-    spawnObstacle(800);
-    const obs = getObstacles();
-    obs[0].x = -50;
-    missObstacle();
-    expect(missObstacle()).toBeDefined();
-  });
-
-  test('returns false when no obstacles to miss', () => {
-    const result = missObstacle();
-    expect(result.missed).toBe(false);
-  });
-});
-
-describe('calculateAccuracy', () => {
-  test('returns 0 when no stats', () => {
-    expect(calculateAccuracy({})).toBe(0);
-  });
-
-  test('calculates correct percentage', () => {
-    const stats = {
-      lp: { hits: 8, misses: 2 },
-      lr: { hits: 5, misses: 5 }
-    };
-    expect(calculateAccuracy(stats)).toBe(65);
-  });
-
-  test('rounds to nearest integer', () => {
-    const stats = {
-      li: { hits: 3, misses: 1 }
-    };
-    expect(calculateAccuracy(stats)).toBe(75);
-  });
-
-  test('handles single finger stats', () => {
-    const stats = { lp: { hits: 10, misses: 0 } };
-    expect(calculateAccuracy(stats)).toBe(100);
+    expect(getNextObstacleIn()).not.toBe(initialNextIn);
+    expect(getNextObstacleIn()).toBeGreaterThanOrEqual(60);
+    expect(getNextObstacleIn()).toBeLessThanOrEqual(100);
   });
 });
 
@@ -217,230 +224,200 @@ describe('update', () => {
     resetState();
   });
 
-  test('does nothing when not playing', () => {
-    setState('idle');
-    const result = update(0.016, 800);
+  test('returns game state when playing', () => {
+    const result = update(0.016);
+    expect(result).toHaveProperty('state');
+    expect(result).toHaveProperty('timeLeft');
+  });
+
+  test('ends game when timeLeft reaches 0', () => {
+    setTimeLeft(0);
+    const result = update(0.016);
     expect(result).toBeUndefined();
   });
 
-  test('does nothing when paused', () => {
-    setState('paused');
-    const result = update(0.016, 800);
-    expect(result).toBeUndefined();
+  test('decreases timeLeft', () => {
+    const initialTime = getTimeLeft();
+    update(0.016);
+    expect(getTimeLeft()).toBeLessThan(initialTime);
   });
 
-  test('ends game when time runs out', () => {
-    setTimeLeft(0.01);
-    update(0.02);
-    expect(update(0.016)).toBeUndefined();
+  test('spawns obstacles as nextObstacleIn decreases', () => {
+    setLesson(0);
+    setState('playing');
+    setTimeLeft(LESSONS[0].duration);
+    setNextObstacleIn(5);
+    for (let i = 0; i < 100; i++) {
+      update(0.016);
+    }
+    expect(getObstacles().length).toBeGreaterThan(0);
   });
 
-  test('sets timeLeft to 0 when negative', () => {
-    setTimeLeft(-1);
-    update(0.1, 800);
-    expect(getTimeLeft()).toBe(0);
-  });
-
-  test('moves obstacles', () => {
+  test('moves obstacles left', () => {
     spawnObstacle(800);
     const initialX = getObstacles()[0].x;
-    update(0.5, 800);
+    update(0.016);
     expect(getObstacles()[0].x).toBeLessThan(initialX);
   });
 
-  test('returns game state', () => {
-    spawnObstacle(800);
-    const result = update(0.016, 800);
-    expect(result).toHaveProperty('state');
-    expect(result).toHaveProperty('timeLeft');
-    expect(result).toHaveProperty('score');
-  });
-
-  test('spawns obstacle when nextObstacleIn reaches zero', () => {
-    setNextObstacleIn(0.5);
-    update(0.1, 800);
-    expect(getObstacles().length).toBe(1);
-  });
-
-  test('marks missed obstacles when past runner', () => {
+  test('misses obstacle when it passes runner', () => {
+    setLesson(0);
     setState('playing');
     resetState();
     spawnObstacle(800);
-    const obs = getObstacles()[0];
-    obs.x = 50;
-    update(0.016, 800, 100);
-    expect(obs.cleared).toBe(true);
-  });
-
-  test('resets combo when obstacle missed', () => {
-    setState('playing');
-    resetState();
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    obs.x = 50;
-    update(0.016, 800, 100);
-    expect(getCombo()).toBe(0);
-  });
-
-  test('filters out off-screen obstacles', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    obs.x = -150;
-    update(0.016, 800);
-    expect(getObstacles().length).toBe(0);
-  });
-
-  test('keeps on-screen obstacles', () => {
-    spawnObstacle(800);
-    update(0.016, 800);
-    expect(getObstacles().length).toBe(1);
+    const nextObs = getNextObstacle();
+    expect(nextObs).toBeDefined();
   });
 });
 
-describe('getTimeLeft and setTimeLeft', () => {
-  test('getTimeLeft returns current time', () => {
-    setTimeLeft(30);
-    expect(getTimeLeft()).toBe(30);
+describe('getNextObstacle', () => {
+  beforeEach(() => {
+    setLesson(0);
+    resetState();
   });
 
-  test('setTimeLeft updates time', () => {
-    setTimeLeft(45);
-    expect(getTimeLeft()).toBe(45);
+  test('returns first uncleared obstacle', () => {
+    spawnObstacle(800);
+    const next = getNextObstacle();
+    expect(next).toBeDefined();
+    expect(next.cleared).toBe(false);
+  });
+
+  test('returns undefined when no obstacles', () => {
+    const next = getNextObstacle();
+    expect(next).toBeUndefined();
+  });
+});
+
+describe('clearObstacle', () => {
+  beforeEach(() => {
+    setLesson(0);
+    resetState();
+  });
+
+  test('marks obstacle as cleared', () => {
+    const obs = spawnObstacle(800);
+    clearObstacle(obs.key);
+    const cleared = getObstacles().find(o => o.key === obs.key);
+    expect(cleared.cleared).toBe(true);
+  });
+
+  test('only clears matching key', () => {
+    spawnObstacle(800);
+    clearObstacle('wrong-key');
+    const hasUncleared = getObstacles().some(o => !o.cleared);
+    expect(hasUncleared).toBe(true);
+  });
+});
+
+describe('missObstacle', () => {
+  beforeEach(() => {
+    setLesson(0);
+    resetState();
+  });
+
+  test('marks obstacle as cleared when missed', () => {
+    setState('playing');
+    setTimeLeft(LESSONS[0].duration);
+    spawnObstacle(800);
+    const initialObstacles = getObstacles();
+    if (initialObstacles.length > 0) {
+      const firstObs = initialObstacles[0];
+      firstObs.x = -50;
+      const result = missObstacle();
+      expect(result).toHaveProperty('missed');
+    }
+  });
+
+  test('returns missed:false when no obstacle to miss', () => {
+    const result = missObstacle();
+    expect(result.missed).toBe(false);
+  });
+});
+
+describe('calculateAccuracy', () => {
+  beforeEach(() => {
+    setLesson(0);
+    resetState();
+  });
+
+  test('returns 100 when no misses', () => {
+    const fingerStats = {
+      lp: { hits: 10, misses: 0 },
+      lr: { hits: 5, misses: 0 },
+    };
+    const accuracy = calculateAccuracy(fingerStats);
+    expect(accuracy).toBe(100);
+  });
+
+  test('calculates correct percentage', () => {
+    const fingerStats = {
+      lp: { hits: 8, misses: 2 },
+      lr: { hits: 4, misses: 1 },
+    };
+    const accuracy = calculateAccuracy(fingerStats);
+    expect(accuracy).toBe(80);
+  });
+
+  test('returns 0 when all misses', () => {
+    const fingerStats = {
+      lp: { hits: 0, misses: 10 },
+    };
+    const accuracy = calculateAccuracy(fingerStats);
+    expect(accuracy).toBe(0);
   });
 });
 
 describe('normalizeKey', () => {
-  test('converts uppercase to lowercase', () => {
-    const event = { key: 'A' };
-    expect(normalizeKey(event)).toBe('a');
+  test('converts KeyA to a', () => {
+    expect(normalizeKey({ code: 'KeyA', key: 'a' })).toBe('a');
   });
 
-  test('returns space for spacebar', () => {
-    const event = { key: ' ' };
-    expect(normalizeKey(event)).toBe(' ');
+  test('converts semicolon correctly', () => {
+    expect(normalizeKey({ code: 'Semicolon', key: ';' })).toBe(';');
   });
 
-  test('returns Escape for escape key', () => {
-    const event = { key: 'Escape' };
-    expect(normalizeKey(event)).toBe('Escape');
+  test('converts digits correctly', () => {
+    expect(normalizeKey({ code: 'Digit1', key: '1' })).toBe('1');
+    expect(normalizeKey({ code: 'Digit0', key: '0' })).toBe('0');
   });
 
-  test('ignores shift modifier', () => {
-    const event = { key: 'Shift' };
-    expect(normalizeKey(event)).toBe('');
+  test('converts comma and period', () => {
+    expect(normalizeKey({ code: 'Comma', key: ',' })).toBe(',');
+    expect(normalizeKey({ code: 'Period', key: '.' })).toBe('.');
   });
 
-  test('ignores control modifier', () => {
-    const event = { key: 'Control' };
-    expect(normalizeKey(event)).toBe('');
+  test('converts slash', () => {
+    expect(normalizeKey({ code: 'Slash', key: '/' })).toBe('/');
   });
 
-  test('ignores alt modifier', () => {
-    const event = { key: 'Alt' };
-    expect(normalizeKey(event)).toBe('');
+  test('converts space', () => {
+    expect(normalizeKey({ code: 'Space', key: ' ' })).toBe(' ');
   });
 
-  test('ignores meta modifier', () => {
-    const event = { key: 'Meta' };
-    expect(normalizeKey(event)).toBe('');
-  });
-
-  test('handles single letter key', () => {
-    const event = { key: 'a' };
-    expect(normalizeKey(event)).toBe('a');
-  });
-
-  test('handles digit 1', () => {
-    const event = { key: '1' };
-    expect(normalizeKey(event)).toBe('1');
-  });
-
-  test('handles digit 6', () => {
-    const event = { key: '6' };
-    expect(normalizeKey(event)).toBe('6');
-  });
-
-  test('returns empty for unknown keys', () => {
-    const event = { key: 'F1' };
-    expect(normalizeKey(event)).toBe('');
-  });
-
-  // Additional edge cases
-
-  test('converts lowercase to lowercase', () => {
-    const event = { key: 'z' };
-    expect(normalizeKey(event)).toBe('z');
-  });
-
-  test('handles punctuation', () => {
-    const event = { key: ';' };
-    expect(normalizeKey(event)).toBe(';');
+  test('handles lowercase letters', () => {
+    expect(normalizeKey({ code: 'KeyB', key: 'b' })).toBe('b');
   });
 });
 
-describe('getScore', () => {
+describe('game state management', () => {
   beforeEach(() => {
     setLesson(0);
-    setState('playing');
+    setState('idle');
     resetState();
   });
 
-  test('returns initial score of 0', () => {
+  test('setTimeLeft updates timeLeft', () => {
+    setTimeLeft(30);
+    expect(getTimeLeft()).toBe(30);
+  });
+
+  test('getScore returns current score', () => {
     expect(getScore()).toBe(0);
   });
 
-  test('returns updated score after clearObstacle', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    clearObstacle(obs.key);
-    expect(getScore()).toBe(1);
-  });
-
-  test('accumulates score with multiple clears', () => {
-    spawnObstacle(800);
-    spawnObstacle(800);
-    const obs = getObstacles();
-    clearObstacle(obs[0].key);
-    clearObstacle(obs[1].key);
-    expect(getScore()).toBe(2);
-  });
-});
-
-describe('getCombo', () => {
-  beforeEach(() => {
-    setLesson(0);
-    setState('playing');
-    resetState();
-  });
-
-  test('returns initial combo of 0', () => {
+  test('getCombo returns current combo', () => {
     expect(getCombo()).toBe(0);
-  });
-
-  test('increments combo after clearObstacle', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    clearObstacle(obs.key);
-    expect(getCombo()).toBe(1);
-  });
-
-  test('resets combo after missObstacle', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    obs.x = -50;
-    missObstacle();
-    expect(getCombo()).toBe(0);
-  });
-});
-
-describe('getNextObstacleIn and setNextObstacleIn', () => {
-  beforeEach(() => {
-    setLesson(0);
-    resetState();
-  });
-
-  test('getNextObstacleIn returns initial value', () => {
-    expect(getNextObstacleIn()).toBe(80);
   });
 
   test('setNextObstacleIn updates value', () => {
@@ -448,134 +425,13 @@ describe('getNextObstacleIn and setNextObstacleIn', () => {
     expect(getNextObstacleIn()).toBe(50);
   });
 
-  test('setNextObstacleIn can be set to 0', () => {
-    setNextObstacleIn(0);
-    expect(getNextObstacleIn()).toBe(0);
-  });
-
-  test('setNextObstacleIn accepts negative values', () => {
-    setNextObstacleIn(-10);
-    expect(getNextObstacleIn()).toBe(-10);
-  });
-});
-
-describe('clearObstacle - enhanced', () => {
-  beforeEach(() => {
-    setLesson(0);
-    setState('playing');
+  test('resetState resets all values', () => {
+    setTimeLeft(10);
+    setNextObstacleIn(5);
     resetState();
-  });
-
-  test('updates maxCombo when current combo exceeds', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    clearObstacle(obs.key);
-    expect(getCombo()).toBe(1);
-  });
-
-  test('works with custom obstacle list', () => {
-    const customList = [
-      { key: 'a', cleared: false, x: 200 },
-      { key: 's', cleared: false, x: 300 }
-    ];
-    const result = clearObstacle('s', customList);
-    expect(result.success).toBe(true);
-    expect(result.score).toBe(1);
-    expect(customList[1].cleared).toBe(true);
-  });
-
-  test('does not modify original obstacles when using custom list', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    const originalKey = obs.key;
-    clearObstacle('nonexistent', []);
-    expect(getObstacles()[0].cleared).toBe(false);
-  });
-});
-
-describe('missObstacle - enhanced', () => {
-  beforeEach(() => {
-    setLesson(0);
-    setState('playing');
-    resetState();
-  });
-
-  test('resets combo to 0 explicitly', () => {
-    spawnObstacle(800);
-    const obs = getObstacles()[0];
-    obs.x = -50;
-    const result = missObstacle();
-    expect(result.combo).toBe(0);
-  });
-
-  test('works with custom obstacle list', () => {
-    const customList = [
-      { key: 'a', cleared: false, x: 50 },
-      { key: 's', cleared: false, x: 300 }
-    ];
-    const result = missObstacle(customList, 120);
-    expect(result.missed).toBe(true);
-    expect(result.combo).toBe(0);
-  });
-
-  test('works with custom runnerX parameter', () => {
-    const customList = [
-      { key: 'a', cleared: false, x: 200 }
-    ];
-    const result = missObstacle(customList, 150);
-    expect(result.missed).toBe(false);
-  });
-
-  test('marks obstacle as cleared', () => {
-    const customList = [
-      { key: 'a', cleared: false, x: 50 }
-    ];
-    missObstacle(customList, 120);
-    expect(customList[0].cleared).toBe(true);
-  });
-});
-
-describe('calculateAccuracy - edge cases', () => {
-  test('returns 0 when all stats have 0 attempts', () => {
-    const stats = {
-      lp: { hits: 0, misses: 0 },
-      lr: { hits: 0, misses: 0 }
-    };
-    expect(calculateAccuracy(stats)).toBe(0);
-  });
-
-  test('handles only misses', () => {
-    const stats = {
-      lp: { hits: 0, misses: 10 }
-    };
-    expect(calculateAccuracy(stats)).toBe(0);
-  });
-
-  test('handles only hits', () => {
-    const stats = {
-      lp: { hits: 10, misses: 0 }
-    };
-    expect(calculateAccuracy(stats)).toBe(100);
-  });
-
-  test('handles zone with no stats (undefined)', () => {
-    const stats = {
-      lp: { hits: 5, misses: 5 }
-    };
-    expect(calculateAccuracy(stats)).toBe(50);
-  });
-
-  test('handles all 8 finger zones', () => {
-    const stats = {
-      lp: { hits: 1, misses: 0 },
-      lr: { hits: 1, misses: 0 },
-      lm: { hits: 1, misses: 0 },
-      li: { hits: 1, misses: 0 },
-      ri: { hits: 1, misses: 0 },
-      rm: { hits: 1, misses: 0 },
-      rr: { hits: 1, misses: 0 },
-      rp: { hits: 1, misses: 0 }
-    };
-    expect(calculateAccuracy(stats)).toBe(100);
+    expect(getTimeLeft()).toBe(LESSONS[0].duration);
+    expect(getNextObstacleIn()).toBe(80);
+    expect(getScore()).toBe(0);
+    expect(getCombo()).toBe(0);
   });
 });

@@ -1,0 +1,128 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]: "SCORE: 0"
+    - generic [ref=e6]: "WORLD: 基准键 Home Row"
+    - generic [ref=e7]:
+      - button "🎵" [ref=e8] [cursor=pointer]
+      - button "暂停" [ref=e9] [cursor=pointer]
+      - button "退出" [ref=e10] [cursor=pointer]
+      - generic [ref=e11]: x0
+      - generic [ref=e12]: 1.0x
+      - generic [ref=e13]: Esc暂停 Tab音乐
+  - generic [ref=e14]:
+    - generic:
+      - heading "暂停 Paused" [level=1]
+      - generic:
+        - button "继续 Resume"
+        - button "选关 Menu"
+      - generic: 按 Esc 继续
+    - generic [ref=e16]:
+      - heading "键盘跑酷" [level=1] [ref=e17]
+      - heading "Keyboard Runner" [level=2] [ref=e18]
+      - paragraph [ref=e19]:
+        - text: 选择练习模式
+        - text: Choose Your Practice Mode
+      - generic [ref=e20]:
+        - button "⌨️ 键位模式 Key Mode 练习指法 · 提升速度" [ref=e21] [cursor=pointer]:
+          - text: ⌨️ 键位模式 Key Mode
+          - text: 练习指法 · 提升速度
+        - button "📖 单词模式 Word Mode 边打字 · 边记单词" [ref=e22] [cursor=pointer]:
+          - text: 📖 单词模式 Word Mode
+          - text: 边打字 · 边记单词
+    - generic:
+      - heading "单词模式" [level=1]
+      - heading "Word Practice" [level=2]
+      - paragraph:
+        - text: 选择单词组别
+        - text: Choose Word Category
+      - generic: 按 Esc 返回
+    - generic:
+      - heading "键位模式" [level=1]
+      - heading "Keyboard Runner" [level=2]
+      - paragraph:
+        - text: 用正确的手指按下对应的键，跳过障碍
+        - text: 准确率 ≥ 60% 解锁下一关
+      - generic:
+        - 'button "1. 基准键 Home Row Best: 0%"':
+          - generic:
+            - strong: "1."
+            - text: 基准键 Home Row
+          - generic: "Best: 0%"
+        - button "2. 基准+上排 Top+Home 🔒":
+          - generic:
+            - strong: "2."
+            - text: 基准+上排 Top+Home
+          - generic: 🔒
+        - button "3. 上排键 Top Row 🔒":
+          - generic:
+            - strong: "3."
+            - text: 上排键 Top Row
+          - generic: 🔒
+        - button "4. 基准+上排综合 Full 🔒":
+          - generic:
+            - strong: "4."
+            - text: 基准+上排综合 Full
+          - generic: 🔒
+        - button "5. 下排键 Bottom Row 🔒":
+          - generic:
+            - strong: "5."
+            - text: 下排键 Bottom Row
+          - generic: 🔒
+        - button "6. 全键盘 Full Keyboard 🔒":
+          - generic:
+            - strong: "6."
+            - text: 全键盘 Full Keyboard
+          - generic: 🔒
+      - generic: 按数字键 1-6 快速选择
+    - generic:
+      - heading "运行结束 Run Complete" [level=1]
+      - generic:
+        - button "再来一次 Retry"
+        - button "选关 Menu"
+      - generic: or press Space
+  - generic [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]: "1"
+      - generic [ref=e26]: "2"
+      - generic [ref=e27]: "3"
+      - generic [ref=e28]: "4"
+      - generic [ref=e29]: "5"
+      - generic [ref=e30]: "6"
+      - generic [ref=e31]: "7"
+      - generic [ref=e32]: "8"
+      - generic [ref=e33]: "9"
+      - generic [ref=e34]: "0"
+    - generic [ref=e35]:
+      - generic [ref=e36]: Q
+      - generic [ref=e37]: W
+      - generic [ref=e38]: E
+      - generic [ref=e39]: R
+      - generic [ref=e40]: T
+      - generic [ref=e41]: "Y"
+      - generic [ref=e42]: U
+      - generic [ref=e43]: I
+      - generic [ref=e44]: O
+      - generic [ref=e45]: P
+    - generic [ref=e46]:
+      - generic [ref=e47]: A
+      - generic [ref=e48]: S
+      - generic [ref=e49]: D
+      - generic [ref=e50]: F
+      - generic [ref=e51]: G
+      - generic [ref=e52]: H
+      - generic [ref=e53]: J
+      - generic [ref=e54]: K
+      - generic [ref=e55]: L
+      - generic [ref=e56]: ;
+    - generic [ref=e57]:
+      - generic [ref=e58]: Z
+      - generic [ref=e59]: X
+      - generic [ref=e60]: C
+      - generic [ref=e61]: V
+      - generic [ref=e62]: B
+      - generic [ref=e63]: "N"
+      - generic [ref=e64]: M
+      - generic [ref=e65]: ","
+      - generic [ref=e66]: .
+      - generic [ref=e67]: /
+    - generic [ref=e69]: SPACE

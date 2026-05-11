@@ -1,37 +1,118 @@
-# keyboard-practice
+# 键盘跑酷 — Keyboard Runner
 
-Keyboard practice game - a fun way to improve your typing skills.
+一款帮助你提升打字技能的有趣打字练习游戏。
 
-## Quick Start
+## 快速开始
 
 ```bash
 cd scripts
 ./start.sh
 ```
 
-This will:
-1. Start a local HTTP server on port 8080
-2. Open the game in your default browser
-3. Press any key to stop the server when done
+这将：
+1. 在端口 8080 启动本地 HTTP 服务器
+2. 在浏览器中打开游戏
+3. 按任意键停止服务器
 
-## Manual Start
+## 手动启动
 
-Open `index.html` directly in your browser, or serve with any HTTP server:
+直接用浏览器打开 `index.html`，或使用任意 HTTP 服务器：
 
 ```bash
 python3 -m http.server 8080
-# Then open http://localhost:8080/index.html
+# 然后访问 http://localhost:8080/index.html
 ```
 
-## Scripts
+## 功能特性
 
-| Script | Description |
-|--------|-------------|
-| `scripts/start.sh` | Start server and open game in browser |
-| `scripts/stop.sh` | Stop the HTTP server |
+### 🎮 游戏模式
+- **跑酷模式**：按正确的键让角色跳跃避开障碍
+- **单词模式**：边打字边记单词，支持6种词汇分类
 
-## Controls
+### 📚 词汇分类
+| 分类 | 词汇量 | 描述 |
+|------|--------|------|
+| IELTS | 600+ | 雅思词汇 |
+| GRE | 300+ | GRE词汇 |
+| CET-4 | 1800+ | 大学英语四级 |
+| CET-6 | 1500+ | 大学英语六级 |
+| FCE | 500+ | 剑桥英语 |
+| NCE | 1700+ | 新概念英语 |
 
-- Type the characters shown on screen
-- Press `Escape` to pause/resume
-- Press `Enter` to restart after game over
+### 🏆 成就系统
+- **初露锋芒**：完成第一个关卡
+- **连击达人**：达成10连击
+- **连击王者**：达成20连击
+- **连击传说**：达成50连击
+- **完美通关**：准确率100%通关
+- **速度恶魔**：WPM超过40
+- **词汇大师**：单词模式通关100词
+- **马拉松**：累计完成500个按键
+- **全关卡通关**：通关所有练习关卡
+
+### ⚡ 连击倍数系统
+| 连击数 | 倍数 | 显示文本 |
+|--------|------|----------|
+| 5 | 1.0x | NICE! |
+| 10 | 1.2x | GREAT! |
+| 15 | 1.5x | AMAZING! |
+| 20 | 2.0x | PERFECT! |
+| 25 | 2.5x | LEGENDARY! |
+| 30 | 3.0x | GODLIKE! |
+| 50 | 4.0x | UNSTOPPABLE! |
+
+### 🎵 背景音乐
+- 内置清新旋律背景音乐
+- 可通过 HUD 按钮开关音乐
+- 按 `Tab` 键切换音乐
+
+## 控制
+
+- 输入屏幕上显示的字符
+- 按 `Escape` 暂停/继续
+- 按 `Enter` 在游戏结束后重新开始
+- 按 `Tab` 开关背景音乐
+
+## 脚本
+
+| 脚本 | 描述 |
+|------|------|
+| `scripts/start.sh` | 启动服务器并在浏览器中打开游戏 |
+| `scripts/stop.sh` | 停止 HTTP 服务器 |
+
+## 测试
+
+```bash
+npm test
+```
+
+运行所有单元测试，验证游戏核心功能。
+
+## 项目结构
+
+```
+keyboard-practice/
+├── index.html          # 主游戏文件
+├── src/
+│   ├── constants.js    # 常量定义（指法区、关卡、单词列表）
+│   ├── game.js        # 游戏逻辑
+│   └── progress.js    # 进度和成就系统
+├── data/
+│   └── words.json    # 单词数据（外部数据源）
+├── tests/
+│   ├── setup.js       # 测试配置
+│   ├── game.test.js   # 游戏逻辑测试
+│   ├── progress.test.js # 进度系统测试
+│   └── constants.test.js # 常量测试
+└── scripts/
+    ├── start.sh       # 启动脚本
+    └── stop.sh        # 停止脚本
+```
+
+## 技术栈
+
+- 原生 JavaScript（无框架依赖）
+- Canvas API 实现游戏渲染
+- Web Audio API 实现音效
+- localStorage 持久化进度
+- Jest 单元测试

@@ -48,6 +48,10 @@ function getScore() {
   return score;
 }
 
+function getMaxCombo() {
+  return maxCombo;
+}
+
 function getNextObstacleIn() {
   return nextObstacleIn;
 }
@@ -66,7 +70,7 @@ function calculateSpeed(dt) {
 function spawnObstacle(canvasWidth = 800) {
   const key = currentLesson().keys[Math.floor(Math.random() * currentLesson().keys.length)];
   const info = KEY_MAP[key];
-  obstacles.push({
+  const obstacle = {
     x: canvasWidth + 40,
     key,
     zone: info.zone,
@@ -75,8 +79,10 @@ function spawnObstacle(canvasWidth = 800) {
     width: 50,
     height: 60,
     cleared: false,
-  });
+  };
+  obstacles.push(obstacle);
   nextObstacleIn = 60 + Math.floor(Math.random() * 40);
+  return obstacle;
 }
 
 function update(dt, canvasWidth = 800, runnerX = 120, groundY = 500) {
@@ -157,10 +163,39 @@ function normalizeKey(e) {
   return '';
 }
 
+function getComboMultiplier(combo) {
+  if (combo >= 50) return 4.0;
+  if (combo >= 30) return 3.0;
+  if (combo >= 25) return 2.5;
+  if (combo >= 20) return 2.0;
+  if (combo >= 15) return 1.5;
+  if (combo >= 10) return 1.2;
+  if (combo >= 5) return 1.0;
+  return 1.0;
+}
+
 module.exports = {
-  currentLesson, setLesson, setState, resetState, calculateSpeed,
-  spawnObstacle, update, getNextObstacle, clearObstacle, missObstacle,
-  calculateAccuracy, normalizeKey, LESSONS, KEY_MAP,
-  getObstacles, getTimeLeft, setTimeLeft, getCombo, getScore,
-  getNextObstacleIn, setNextObstacleIn
+  currentLesson,
+  setLesson,
+  setState,
+  resetState,
+  calculateSpeed,
+  spawnObstacle,
+  update,
+  getNextObstacle,
+  clearObstacle,
+  missObstacle,
+  calculateAccuracy,
+  normalizeKey,
+  LESSONS,
+  KEY_MAP,
+  getObstacles,
+  getTimeLeft,
+  setTimeLeft,
+  getCombo,
+  getScore,
+  getMaxCombo,
+  getNextObstacleIn,
+  setNextObstacleIn,
+  getComboMultiplier,
 };
