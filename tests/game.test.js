@@ -364,4 +364,218 @@ describe('normalizeKey', () => {
     const event = { key: 'F1' };
     expect(normalizeKey(event)).toBe('');
   });
+
+  // Additional edge cases
+
+  test('converts lowercase to lowercase', () => {
+    const event = { key: 'z' };
+    expect(normalizeKey(event)).toBe('z');
+  });
+
+  test('handles punctuation', () => {
+    const event = { key: ';' };
+    expect(normalizeKey(event)).toBe(';');
+  });
+});
+
+describe('getScore', () => {
+  beforeEach(() => {
+    setLesson(0);
+    setState('playing');
+    resetState();
+  });
+
+  test('returns initial score of 0', () => {
+    expect(getScore()).toBe(0);
+  });
+
+  test('returns updated score after clearObstacle', () => {
+    spawnObstacle(800);
+    const obs = getObstacles()[0];
+    clearObstacle(obs.key);
+    expect(getScore()).toBe(1);
+  });
+
+  test('accumulates score with multiple clears', () => {
+    spawnObstacle(800);
+    spawnObstacle(800);
+    const obs = getObstacles();
+    clearObstacle(obs[0].key);
+    clearObstacle(obs[1].key);
+    expect(getScore()).toBe(2);
+  });
+});
+
+describe('getCombo', () => {
+  beforeEach(() => {
+    setLesson(0);
+    setState('playing');
+    resetState();
+  });
+
+  test('returns initial combo of 0', () => {
+    expect(getCombo()).toBe(0);
+  });
+
+  test('increments combo after clearObstacle', () => {
+    spawnObstacle(800);
+    const obs = getObstacles()[0];
+    clearObstacle(obs.key);
+    expect(getCombo()).toBe(1);
+  });
+
+  test('resets combo after missObstacle', () => {
+    spawnObstacle(800);
+    const obs = getObstacles()[0];
+    obs.x = -50;
+    missObstacle();
+    expect(getCombo()).toBe(0);
+  });
+});
+
+describe('getNextObstacleIn and setNextObstacleIn', () => {
+  beforeEach(() => {
+    setLesson(0);
+    resetState();
+  });
+
+  test('getNextObstacleIn returns initial value', () => {
+    expect(getNextObstacleIn()).toBe(80);
+  });
+
+  test('setNextObstacleIn updates value', () => {
+    setNextObstacleIn(50);
+    expect(getNextObstacleIn()).toBe(50);
+  });
+
+  test('setNextObstacleIn can be set to 0', () => {
+    setNextObstacleIn(0);
+    expect(getNextObstacleIn()).toBe(0);
+  });
+
+  test('setNextObstacleIn accepts negative values', () => {
+    setNextObstacleIn(-10);
+    expect(getNextObstacleIn()).toBe(-10);
+  });
+});
+
+describe('clearObstacle - enhanced', () => {
+  beforeEach(() => {
+    setLesson(0);
+    setState('playing');
+    resetState();
+  });
+
+  test('updates maxCombo when current combo exceeds', () => {
+    spawnObstacle(800);
+    const obs = getObstacles()[0];
+    clearObstacle(obs.key);
+    expect(getCombo()).toBe(1);
+  });
+
+  test('works with custom obstacle list', () => {
+    const customList = [
+      { key: 'a', cleared: false, x: 200 },
+      { key: 's', cleared: false, x: 300 }
+    ];
+    const result = clearObstacle('s', customList);
+    expect(result.success).toBe(true);
+    expect(result.score).toBe(1);
+    expect(customList[1].cleared).toBe(true);
+  });
+
+  test('does not modify original obstacles when using custom list', () => {
+    spawnObstacle(800);
+    const obs = getObstacles()[0];
+    const originalKey = obs.key;
+    clearObstacle('nonexistent', []);
+    expect(getObstacles()[0].cleared).toBe(false);
+  });
+});
+
+describe('missObstacle - enhanced', () => {
+  beforeEach(() => {
+    setLesson(0);
+    setState('playing');
+    resetState();
+  });
+
+  test('resets combo to 0 explicitly', () => {
+    spawnObstacle(800);
+    const obs = getObstacles()[0];
+    obs.x = -50;
+    const result = missObstacle();
+    expect(result.combo).toBe(0);
+  });
+
+  test('works with custom obstacle list', () => {
+    const customList = [
+      { key: 'a', cleared: false, x: 50 },
+      { key: 's', cleared: false, x: 300 }
+    ];
+    const result = missObstacle(customList, 120);
+    expect(result.missed).toBe(true);
+    expect(result.combo).toBe(0);
+  });
+
+  test('works with custom runnerX parameter', () => {
+    const customList = [
+      { key: 'a', cleared: false, x: 200 }
+    ];
+    const result = missObstacle(customList, 150);
+    expect(result.missed).toBe(false);
+  });
+
+  test('marks obstacle as cleared', () => {
+    const customList = [
+      { key: 'a', cleared: false, x: 50 }
+    ];
+    missObstacle(customList, 120);
+    expect(customList[0].cleared).toBe(true);
+  });
+});
+
+describe('calculateAccuracy - edge cases', () => {
+  test('returns 0 when all stats have 0 attempts', () => {
+    const stats = {
+      lp: { hits: 0, misses: 0 },
+      lr: { hits: 0, misses: 0 }
+    };
+    expect(calculateAccuracy(stats)).toBe(0);
+  });
+
+  test('handles only misses', () => {
+    const stats = {
+      lp: { hits: 0, misses: 10 }
+    };
+    expect(calculateAccuracy(stats)).toBe(0);
+  });
+
+  test('handles only hits', () => {
+    const stats = {
+      lp: { hits: 10, misses: 0 }
+    };
+    expect(calculateAccuracy(stats)).toBe(100);
+  });
+
+  test('handles zone with no stats (undefined)', () => {
+    const stats = {
+      lp: { hits: 5, misses: 5 }
+    };
+    expect(calculateAccuracy(stats)).toBe(50);
+  });
+
+  test('handles all 8 finger zones', () => {
+    const stats = {
+      lp: { hits: 1, misses: 0 },
+      lr: { hits: 1, misses: 0 },
+      lm: { hits: 1, misses: 0 },
+      li: { hits: 1, misses: 0 },
+      ri: { hits: 1, misses: 0 },
+      rm: { hits: 1, misses: 0 },
+      rr: { hits: 1, misses: 0 },
+      rp: { hits: 1, misses: 0 }
+    };
+    expect(calculateAccuracy(stats)).toBe(100);
+  });
 });
